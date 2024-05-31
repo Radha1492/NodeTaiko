@@ -1,0 +1,25 @@
+function generateUniqueEmail() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0'); // Months are zero-indexed
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
+
+  const uniqueEmail = `user${year}${month}${day}${hours}${minutes}${seconds}${milliseconds}@example.com`;
+  return uniqueEmail;
+}
+
+export { generateUniqueEmail };
+
+
+I am working on QA automation project. Automate a web application with Cypress and JavaScript. I have no idea about the automation framework. Can you please help me to design automation approach and framework design. How I should design the framework, How to handle input test data, how to design re-usable functions and all
+
+Thanks for your response. In this project I have an email id field on user detail form. This email field accept a unique email address every time. I have to automate this test case what approach I should follow to generate a unique email address at run time
+
+Here in above code in Step 1: Create a Utility Function I want to create unique string on basis of todays date and time
+
+In above code 1. Create a Utility Function with Date and Time. Strings is not concatenated properly
+
