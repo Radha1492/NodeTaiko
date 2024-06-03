@@ -1,0 +1,25 @@
+describe('Intercept and mock GET request', () => {
+  beforeEach(() => {
+    // Intercept the GET request and mock the response
+    cy.intercept('GET', '/api/endpoint', {
+      statusCode: 200,
+      body: { key: 'mockedValue' },
+    }).as('getMockedData');
+    
+    // Visit the page that makes the GET request
+    cy.visit('/path-to-your-page');
+  });
+
+  it('should display the mocked response', () => {
+    // Wait for the GET request to be intercepted
+    cy.wait('@getMockedData');
+    
+    // Verify that the mocked response is displayed on the page
+    cy.contains('mockedValue').should('be.visible');
+  });
+});
+
+
+
+
+
