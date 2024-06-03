@@ -1,0 +1,57 @@
+// cypress/support/commands.js
+const twilio = require('twilio');
+
+Cypress.Commands.add('getOTP', (accountSid, authToken, twilioNumber, toNumber) => {
+  const client = twilio(accountSid, authToken);
+
+  return client.messages
+    .list({ to: toNumber, from: twilioNumber, limit: 5 })
+    .then(messages => {
+      if (messages.length === 0) {
+        throw new Error('No messages found');
+      }
+      const latestMessage = messages[0];
+      const otp = latestMessage.body.match(/\d{4,6}/); // Assuming OTP is a 4-6 digit number
+      if (!otp) {
+        throw new Error('OTP not found in the message');
+      }
+      return otp[0];
+    });
+});
+
+
+
+4. Use the OTP in your Cypress test
+Use the custom command in your Cypress test to retrieve and use the OTP.
+
+// cypress/integration/otp_login_spec.js
+describe('OTP Login Test', () => {
+  const accountSid = 'your_twilio_account_sid';
+  const authToken = 'your_twilio_auth_token';
+  const twilioNumber = 'your_twilio_number';
+  const toNumber = 'number_receiving_otp';
+
+  it('logs in with OTP', () => {
+    cy.visit('your_application_url');
+
+    // Enter the mobile number and trigger the OTP send action
+    cy.get('#mobile_number_input').type(toNumber);
+    cy.get('#send_otp_button').click();
+
+    // Wait for OTP to be received
+    cy.wait(10000); // Adjust the wait time as needed
+
+    // Get OTP from Twilio
+    cy.getOTP(accountSid, authToken, twilioNumber, toNumber).then(otp => {
+      // Enter OTP and submit the login form
+      cy.get('#otp_input').type(otp);
+      cy.get('#login_button').click();
+
+      // Add assertions to verify successful login
+      cy.url().should('include', '/dashboard');
+    });
+  });
+});
+
+
+
