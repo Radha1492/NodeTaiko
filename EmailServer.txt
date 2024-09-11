@@ -1,0 +1,528 @@
+To automate the process of receiving an email and extracting a link from the email body in Cypress, you can utilize an IMAP library, such as imap-simple, since Cypress itself doesn’t have built-in support for email interactions. Below is an approach using the imap-simple library for connecting to Outlook, reading the email, and extracting the link.
+
+Steps:
+Install necessary packages:
+
+npm install imap-simple mailparser
+
+Write a utility function to connect to the email server, fetch the email, and extract the link.
+
+Integrate this utility in your Cypress test script.
+
+Here’s how to write the test:
+Create a utility function (emailHelper.js):
+
+const imaps = require('imap-simple');
+const { simpleParser } = require('mailparser');
+
+const config = {
+  imap: {
+    user: 'your-email@domain.com', // replace with your Outlook email
+    password: 'your-password',     // replace with your Outlook password
+    host: 'imap-mail.outlook.com',
+    port: 993,
+    tls: true,
+    authTimeout: 3000
+  }
+};
+
+async function getOTPEmail() {
+  try {
+    const connection = await imaps.connect({ imap: config.imap });
+    await connection.openBox('INBOX');
+
+    const searchCriteria = ['UNSEEN']; // Only fetch unseen emails, modify criteria as needed
+    const fetchOptions = { bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT'], markSeen: true };
+
+    const results = await connection.search(searchCriteria, fetchOptions);
+    let link = null;
+
+    for (const res of results) {
+      const mail = await simpleParser(res.parts.filter(part => part.which === 'TEXT')[0].body);
+
+      // Example: Assuming the OTP link is inside the body and starts with http/https
+      const regex = /(https?:\/\/[^\s]+)/;
+      const found = mail.text.match(regex);
+
+      if (found) {
+        link = found[0];
+        break; // Stop once the link is found
+      }
+    }
+    
+    connection.end();
+    return link;
+  } catch (err) {
+    console.error('Error fetching email: ', err);
+  }
+}
+
+module.exports = { getOTPEmail };
+
+Modify your Cypress test case to use the utility:
+
+const { getOTPEmail } = require('../support/emailHelper');
+
+describe('Test Case: Fetch OTP Link from Email', () => {
+  it('Login and fetch OTP email link', () => {
+    // Your login logic here
+    cy.visit('https://your-app-url.com'); // Replace with actual application URL
+    cy.get('#username').type('your-username'); // Replace with actual username field
+    cy.get('#password').type('your-password'); // Replace with actual password field
+    cy.get('#login-button').click(); // Replace with actual login button
+
+    // Fetch OTP link from email
+    cy.task('getOTPEmail').then((otpLink) => {
+      expect(otpLink).to.include('https'); // Verify link format
+      cy.visit(otpLink); // Use the extracted link for the next steps
+    });
+  });
+});
+
+
+
+Add a Cypress task in cypress.config.js:
+
+
+const { getOTPEmail } = require('./cypress/support/emailHelper');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        getOTPEmail() {
+          return getOTPEmail();
+        }
+      });
+    },
+  },
+};
+
+
+This approach uses the imap-simple library to connect to Outlook’s IMAP server, fetch unread emails, extract the OTP link, and continue with the test flow.
+
+Make sure to replace all placeholders like the user, password, login-button, and other elements with actual values based on your application. You can add additional error handling and customize email search criteria as needed.
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+To automate the process of logging into web Outlook, finding the email, and extracting the hyperlink, you can use a combination of Cypress commands and a library like node-imap or imap-simple to handle the email retrieval via IMAP, as Cypress itself doesn't directly support accessing Outlook's web interface.
+
+Here’s a high-level approach to guide you:
+
+Step 1: Access Webmail and Login
+You can automate logging into Outlook Web Access (OWA) using Cypress commands:
+
+describe('Webmail Login and Email Handling', () => {
+  it('Logs into Web Outlook', () => {
+    cy.visit('https://sainamail.abcfg.rbs.com/owa/auth/logon.aspx?'); // Visit the OWA URL
+
+    // Enter login credentials
+    cy.get('#username').type('your-username'); // Replace with actual input field ID
+    cy.get('#password').type('your-password'); // Replace with actual input field ID
+
+    // Click login button
+    cy.get('#loginButton').click(); // Replace with actual login button selector
+  });
+});
+
+
+Step 2: Search and Read the Email (via IMAP)
+Using imap-simple, you can connect to the email server, search for the email by the user's name, and extract the hyperlink from the email body.
+
+Install the necessary libraries:
+
+npm install imap-simple
+
+
+Create a Cypress task to handle the IMAP connection:
+
+const imaps = require('imap-simple');
+
+module.exports = (on, config) => {
+  on('task', {
+    fetchEmail({ username, password, subject }) {
+      const config = {
+        imap: {
+          user: username,
+          password: password,
+          host: 'imap.mail.server.com', // Your IMAP server
+          port: 993,
+          tls: true,
+          authTimeout: 3000
+        }
+      };
+
+      return imaps.connect(config).then((connection) => {
+        return connection.openBox('INBOX').then(() => {
+          const searchCriteria = [['FROM', 'your-application@example.com'], ['SUBJECT', subject]];
+          const fetchOptions = { bodies: ['HEADER', 'TEXT'], struct: true };
+
+          return connection.search(searchCriteria, fetchOptions).then((messages) => {
+            const parsedEmails = messages.map((message) => {
+              const all = _.find(message.parts, { which: 'TEXT' });
+              const html = all.body;
+              const link = html.match(/https?:\/\/[^\s]+/g); // Extract hyperlink from the body
+              return link ? link[0] : null;
+            });
+            connection.end();
+            return parsedEmails;
+          });
+        });
+      });
+    }
+  });
+};
+
+
+Step 3: Use the Task in Your Cypress Test
+
+describe('Extract hyperlink from email', () => {
+  it('Logs into webmail and extracts hyperlink from the email', () => {
+    cy.task('fetchEmail', {
+      username: 'your-email@domain.com',
+      password: 'your-email-password',
+      subject: 'Expected Email Subject'
+    }).then((links) => {
+      // Do something with the extracted link, like visiting it
+      cy.visit(links[0]); // Visit the first link found
+    });
+  });
+});
+
+
+Adjustments:
+Update the selectors (#username, #password, #loginButton) according to your webmail page structure.
+Modify the IMAP configuration to match your actual mail server settings (imap.mail.server.com).
+Replace the username and password with your actual login credentials.
+Adjust the email parsing logic to extract the hyperlink correctly based on the structure of the email body.
+This approach allows you to log in, search for an email, and extract the hyperlink dynamically. Let me know if you need further adjustments!
+
+1. Outlook Webmail (Office 365 / Exchange)
+Login to your Outlook Webmail (using the same webmail URL you provided, or something similar like outlook.office.com).
+Go to Settings:
+Click on the gear icon in the upper-right corner of the page.
+Scroll down and click on "View all Outlook settings".
+Under Mail, go to the Sync email or POP and IMAP section. There, you should find the following IMAP configuration details:
+IMAP Server: Usually something like imap.outlook.com
+IMAP Port: Typically 993
+Encryption: SSL/TLS
+SMTP Server (for sending emails): smtp.outlook.com (Port 587)
+2. For Other Email Providers (Gmail, Yahoo, etc.)
+Gmail IMAP Settings:
+IMAP Server: imap.gmail.com
+IMAP Port: 993
+Encryption: SSL
+SMTP Server: smtp.gmail.com
+SMTP Port: 587 (TLS)
+Yahoo IMAP Settings:
+IMAP Server: imap.mail.yahoo.com
+IMAP Port: 993
+Encryption: SSL
+SMTP Server: smtp.mail.yahoo.com
+SMTP Port: 587
+3. For Corporate Email
+Contact your IT administrator or check your company's documentation for IMAP settings. Corporate email systems might use custom IMAP servers and ports, so your IT department should provide the exact information.
+If your organization uses Microsoft Exchange or Office 365, they will provide the IMAP server details specific to their configuration.
+4. Desktop Email Client (Outlook, Thunderbird, etc.)
+If you're using a desktop email client like Microsoft Outlook or Thunderbird, you can check the IMAP settings by going to the account settings in the app. It will show the IMAP server, port, and encryption settings used to connect to the email server.
+Let me know if you need any help configuring it based on what you find!
+
+
+
+
+
+
+You said:
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+To automate the process of reading an email from Outlook Webmail and extracting a hyperlink using Cypress, you can use an API or a third-party service to fetch and process the emails since Cypress doesn't have direct access to interact with email clients.
+
+Here’s how you can approach this:
+
+Steps to Automate the Email Fetching and Hyperlink Extraction:
+Use a Library or API for Email Handling: Since Cypress is not meant for directly interacting with external services like email clients, you’ll need an API or library that can connect to the Outlook Webmail server and fetch the emails.
+
+Microsoft Graph API: You can use the Microsoft Graph API to access emails in Outlook. The Graph API allows you to query the mailbox, retrieve emails, and extract content programmatically.
+Node.js Libraries: You can use a Node.js library like imap or nodemailer to read emails. However, this would require setting up a connection to the mail server using IMAP.
+Extracting the Hyperlink: Once you retrieve the email body, you can use string manipulation or regular expressions to extract the hyperlink from the email body.
+
+Example Solution Using Microsoft Graph API:
+Prerequisites:
+Microsoft Graph API access: You need an application registered in Azure AD to access the Microsoft Graph API.
+OAuth Authentication: You'll have to authenticate using OAuth to interact with the mailbox.
+Steps:
+Register an Application in Azure AD: This application will allow access to the Microsoft Graph API.
+
+Go to Azure Portal > Azure Active Directory > App registrations > New Registration.
+Set permissions for the app to read email (Mail.Read).
+Get an OAuth Token: Use a script to authenticate and get an access token.
+
+Fetch Emails: Once authenticated, you can use the following API call to get the latest email:
+
+const axios = require('axios');
+
+async function getEmail(token) {
+    const response = await axios.get('https://graph.microsoft.com/v1.0/me/messages', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+    const email = response.data.value[0]; // The latest email
+    return email.body.content;
+}
+
+
+
+Extract the Hyperlink: After fetching the email body, you can extract the hyperlink using regular expressions.
+
+function extractHyperlink(emailBody) {
+    const regex = /https?:\/\/[^\s]+/g;
+    const hyperlinks = emailBody.match(regex);
+    return hyperlinks ? hyperlinks[0] : null;
+}
+
+
+Cypress Task: Define a Cypress task in your cypress.config.js to interact with the email API and retrieve the email.
+
+const axios = require('axios');
+
+module.exports = (on, config) => {
+    on('task', {
+        getLatestEmail() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const token = 'YOUR_OAUTH_TOKEN'; // Get OAuth token
+                    const emailBody = await getEmail(token);
+                    const hyperlink = extractHyperlink(emailBody);
+                    resolve(hyperlink);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+    });
+};
+
+Using the Task in Cypress Test: In your Cypress test, you can now invoke the task to get the hyperlink.
+
+describe('Email Automation Test', () => {
+    it('Should fetch the hyperlink from the latest email', () => {
+        cy.task('getLatestEmail').then((hyperlink) => {
+            expect(hyperlink).to.contain('https://'); // Verify it's a hyperlink
+            cy.visit(hyperlink); // Visit the extracted link
+        });
+    });
+});
+
+
+Summary:
+Microsoft Graph API helps you interact with Outlook Webmail programmatically.
+You can use Cypress tasks to fetch emails and extract links.
+Once the hyperlink is extracted, you can further automate actions based on the extracted URL.
+Let me know if you need further details on the steps or guidance for implementation!
+
+
+
+
+
+
+You said:
+Can you share with imap library as well
+ChatGPT said:
+ChatGPT
+Sure! Using the imap library for handling emails with the IMAP protocol is another approach to automate reading emails and extracting hyperlinks. Here's how you can set this up using the imap and mailparser Node.js libraries.
+
+Steps to Automate Email Fetching and Extracting Hyperlink Using IMAP:
+Prerequisites:
+Node.js: Ensure that Node.js is installed.
+IMAP access: You need access to the Outlook email account via IMAP. Make sure IMAP is enabled on your Outlook account.
+Install Required Libraries:
+imap: To connect to the email server and fetch emails.
+mailparser: To parse the email body.
+You can install these libraries with npm:
+
+npm install imap simple-imap mailparser
+
+
+Example Code to Fetch Emails Using imap:
+Step 1: Configure and Set Up IMAP
+You'll need to configure the IMAP connection and specify the mailbox (INBOX).
+
+const Imap = require('imap');
+const { simpleParser } = require('mailparser');
+
+const imap = new Imap({
+  user: 'your-email@example.com',
+  password: 'your-password',
+  host: 'outlook.office365.com', // Outlook IMAP host
+  port: 993,
+  tls: true
+});
+
+function openInbox(callback) {
+  imap.openBox('INBOX', true, callback);
+}
+
+imap.once('ready', function () {
+  openInbox(function (err, box) {
+    if (err) throw err;
+
+    // Search for unseen messages
+    imap.search(['UNSEEN'], function (err, results) {
+      if (err) throw err;
+      if (results.length === 0) {
+        console.log('No new emails');
+        imap.end();
+        return;
+      }
+
+      const f = imap.fetch(results, { bodies: '' });
+
+      f.on('message', function (msg) {
+        msg.on('body', function (stream) {
+          simpleParser(stream, (err, parsed) => {
+            if (err) throw err;
+
+            const emailBody = parsed.text; // Get the email body text
+            console.log('Email body:', emailBody);
+
+            // Extract the hyperlink
+            const hyperlink = extractHyperlink(emailBody);
+            if (hyperlink) {
+              console.log('Extracted hyperlink:', hyperlink);
+            } else {
+              console.log('No hyperlink found in the email');
+            }
+          });
+        });
+      });
+
+      f.once('error', function (err) {
+        console.log('Fetch error: ' + err);
+      });
+
+      f.once('end', function () {
+        console.log('Done fetching all unseen emails.');
+        imap.end();
+      });
+    });
+  });
+});
+
+// Start the IMAP connection
+imap.connect();
+
+imap.once('error', function (err) {
+  console.log(err);
+});
+
+imap.once('end', function () {
+  console.log('Connection ended');
+});
+
+
+Step 2: Extract Hyperlink Using a Regular Expression
+Once you get the email body, you can extract the hyperlink using a regular expression.
+
+function extractHyperlink(emailBody) {
+  const regex = /https?:\/\/[^\s]+/g;
+  const hyperlinks = emailBody.match(regex);
+  return hyperlinks ? hyperlinks[0] : null;
+}
+
+
+Step 3: Cypress Task to Fetch Email and Extract Hyperlink
+Now, set up a Cypress task in the cypress.config.js file to run this Node.js email script and return the hyperlink.
+
+module.exports = (on, config) => {
+  on('task', {
+    getLatestEmail() {
+      return new Promise((resolve, reject) => {
+        const Imap = require('imap');
+        const { simpleParser } = require('mailparser');
+
+        const imap = new Imap({
+          user: 'your-email@example.com',
+          password: 'your-password',
+          host: 'outlook.office365.com', // Outlook IMAP host
+          port: 993,
+          tls: true
+        });
+
+        function openInbox(callback) {
+          imap.openBox('INBOX', true, callback);
+        }
+
+        imap.once('ready', function () {
+          openInbox(function (err, box) {
+            if (err) reject(err);
+
+            imap.search(['UNSEEN'], function (err, results) {
+              if (err) reject(err);
+
+              if (results.length === 0) {
+                resolve('No new emails');
+                imap.end();
+                return;
+              }
+
+              const f = imap.fetch(results, { bodies: '' });
+
+              f.on('message', function (msg) {
+                msg.on('body', function (stream) {
+                  simpleParser(stream, (err, parsed) => {
+                    if (err) reject(err);
+
+                    const emailBody = parsed.text;
+                    const hyperlink = extractHyperlink(emailBody);
+                    resolve(hyperlink);
+                  });
+                });
+              });
+
+              f.once('error', function (err) {
+                reject(err);
+              });
+
+              f.once('end', function () {
+                imap.end();
+              });
+            });
+          });
+        });
+
+        imap.once('error', function (err) {
+          reject(err);
+        });
+
+        imap.once('end', function () {
+          console.log('Connection ended');
+        });
+
+        imap.connect();
+      });
+    }
+  });
+};
+
+
+Step 4: Use the Cypress Task in a Test
+Finally, call the getLatestEmail task in your Cypress test to fetch and use the hyperlink.
+
+describe('Email Automation Test', () => {
+  it('Should fetch the hyperlink from the latest email', () => {
+    cy.task('getLatestEmail').then((hyperlink) => {
+      expect(hyperlink).to.contain('https://'); // Verify it's a hyperlink
+      cy.visit(hyperlink); // Visit the extracted link
+    });
+  });
+});
+
+
+Summary:
+IMAP allows you to connect to the Outlook email inbox and fetch new emails.
+mailparser parses the email content, making it easier to extract the body and hyperlinks.
+A Cypress task integrates the email fetching process, and you can use it within your test.
+This solution offers a straightforward way to automate email processing with the IMAP protocol. Let me know if you need more assistance with any of the steps!
+
