@@ -450,3 +450,197 @@ Troubleshooting
 Email Delays: Sometimes, emails may take a while to arrive. If this is the case, you can add a wait or retry mechanism before fetching the email.
 No Link Found: Ensure that the email content is being parsed correctly and that the link pattern matches what you expect.
 This example should give you a complete guide to automating the process of retrieving an email from Outlook and following a link within it using Cypress.
+
+@@@@@@@@ DB Assertions:::
+
+Cypress allows a variety of assertions for validating database query results. These assertions are used to check different conditions, such as equality, length, type, and structure of the returned data from your database query. Below are some commonly used assertions that you can implement for database validation.
+
+1. Equality Assertions
+Used to check whether a value is equal to an expected value. This is useful for validating specific data points in a row or a particular query result.
+
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users').then((result) => {
+  const firstRow = result[0];
+
+  // Check if the 'name' column equals "John Doe"
+  expect(firstRow.name).to.equal('John Doe');
+
+  // Check if the 'id' column equals 1 (strict equality for numbers)
+  expect(firstRow.id).to.equal(1);
+});
+
+
+Deep Equality Assertions
+For comparing entire objects, where all properties of the object should match the expected values.
+
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users').then((result) => {
+  const expectedUser = { id: 1, name: 'John Doe', email: 'john@example.com' };
+
+  // Validate that the first row matches the expected object
+  expect(result[0]).to.deep.equal(expectedUser);
+});
+
+
+ Length Assertions
+Used to validate the number of rows returned by a query.
+
+cy.task('queryDatabase', 'SELECT * FROM users WHERE active = 1').then((result) => {
+  // Check if there are exactly 5 active users
+  expect(result).to.have.length(5);
+});
+
+
+Existence/Non-Existence Assertions
+Used to check whether specific data exists or doesn't exist in the result set.
+
+cy.task('queryDatabase', 'SELECT * FROM users WHERE email = "nonexistent@example.com"').then((result) => {
+  // Validate that no user with this email exists
+  expect(result).to.be.empty;
+});
+
+
+cy.task('queryDatabase', 'SELECT * FROM users WHERE email = "john@example.com"').then((result) => {
+  // Validate that the user exists
+  expect(result).to.not.be.empty;
+});
+
+
+Type Assertions
+Used to verify the data type of a particular value returned from the query.
+
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users').then((result) => {
+  const firstRow = result[0];
+
+  // Check if the 'id' column is a number
+  expect(firstRow.id).to.be.a('number');
+
+  // Check if the 'name' column is a string
+  expect(firstRow.name).to.be.a('string');
+});
+
+
+Greater Than / Less Than Assertions
+Useful for comparing numerical or date-based values.
+
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users ORDER BY created_at DESC').then((result) => {
+  const firstRow = result[0];
+
+  // Validate that the user ID is greater than 0
+  expect(firstRow.id).to.be.greaterThan(0);
+
+  // Validate that the user was created after a certain date
+  const createdDate = new Date(firstRow.created_at);
+  expect(createdDate.getFullYear()).to.be.greaterThan(2020);
+});
+
+
+7. Contain/Include Assertions
+Used for checking if a result includes specific values, often used with strings or arrays.
+
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users').then((result) => {
+  const firstRow = result[0];
+
+  // Check if the 'email' contains '@example.com'
+  expect(firstRow.email).to.include('@example.com');
+
+  // Check if the 'roles' array includes 'admin'
+  expect(firstRow.roles).to.include('admin');
+});
+
+8. Array-Specific Assertions
+Used for validating that returned data is an array and contains the expected values.
+
+cy.task('queryDatabase', 'SELECT roles FROM users WHERE id = 1').then((result) => {
+  const rolesArray = result[0].roles; // Assuming roles is an array
+
+  // Check if roles is an array
+  expect(rolesArray).to.be.an('array');
+
+  // Check if the roles array includes 'admin'
+  expect(rolesArray).to.include('admin');
+});
+
+9. Property Assertions
+Used to verify the presence or absence of certain properties (columns) in the result.
+
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users').then((result) => {
+  const firstRow = result[0];
+
+  // Check if the row has a 'name' property
+  expect(firstRow).to.have.property('name');
+
+  // Check if the row has a 'created_at' property
+  expect(firstRow).to.have.property('created_at');
+
+  // Validate that 'id' exists and is equal to 1
+  expect(firstRow).to.have.property('id', 1);
+});
+
+
+10. Negations
+Assertions can also be negated to check for the opposite condition.
+
+cy.task('queryDatabase', 'SELECT * FROM users WHERE id = 1').then((result) => {
+  const firstRow = result[0];
+
+  // Ensure that 'name' is not equal to "Jane Doe"
+  expect(firstRow.name).to.not.equal('Jane Doe');
+
+  // Ensure the 'roles' array does not include 'guest'
+  expect(firstRow.roles).to.not.include('guest');
+});
+
+
+11. Date Assertions
+Used to compare date fields.
+cy.task('queryDatabase', 'SELECT TOP 1 * FROM users ORDER BY created_at DESC').then((result) => {
+  const createdDate = new Date(result[0].created_at);
+
+  // Check if the created date is a valid date
+  expect(createdDate).to.be.a('date');
+
+  // Ensure the user was created after January 1, 2022
+  expect(createdDate).to.be.greaterThan(new Date('2022-01-01'));
+});
+
+Example Scenario
+Let’s say you have a table called users with columns id, name, email, and created_at. You want to:
+
+Validate the data type of certain columns.
+Ensure that a user exists.
+Check the number of users.
+Ensure the email format is correct.
+
+cy.task('queryDatabase', 'SELECT * FROM users WHERE id = 1').then((result) => {
+  const firstRow = result[0];
+
+  // Check that a user with id 1 exists
+  expect(result).to.have.length.greaterThan(0);
+
+  // Validate that the 'id' is a number
+  expect(firstRow.id).to.be.a('number');
+
+  // Ensure the 'name' is a string
+  expect(firstRow.name).to.be.a('string');
+
+  // Validate that the email contains '@example.com'
+  expect(firstRow.email).to.include('@example.com');
+
+  // Ensure the 'created_at' is a valid date
+  expect(new Date(firstRow.created_at)).to.be.a('date');
+});
+
+
+Summary of Assertions
+Equality: .to.equal()
+Deep Equality: .to.deep.equal()
+Length: .to.have.length(), .to.have.length.greaterThan()
+Existence: .to.not.be.empty, .to.be.empty
+Type: .to.be.a()
+Greater Than/Less Than: .to.be.greaterThan(), .to.be.lessThan()
+Contain/Include: .to.include()
+Array: .to.be.an('array'), .to.include()
+Property: .to.have.property()
+Negation: .to.not.equal()
+Date: .to.be.a('date'), .to.be.greaterThan()
+These assertions can be tailored based on the structure of your database and the specific validations you need to perform.
+
