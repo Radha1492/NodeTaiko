@@ -724,6 +724,73 @@ describe('Login Test with Detailed Report', () => {
 
 });
 
+@@@ on task @@@
+const fs = require('fs');
+const path = require('path');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logStep({ stepName, actionDescription, status }) {
+          console.log(`Step: ${stepName} | Action: ${actionDescription} | Status: ${status}`);
+          return null;
+        },
+      });
+    },
+  },
+  reporter: "mochawesome",
+  reporterOptions: {
+    reportDir: "cypress/reports",
+    overwrite: false,
+    html: true,
+    json: true,
+    reportTitle: "Detailed Test Report",
+  },
+};
+
+describe('Login Test with Detailed Report', () => {
+
+  it('Should log test steps with pass/fail status', () => {
+
+    // Step 1: Open browser and enter URL
+    cy.visit('https://example.com');
+    cy.task('logStep', {
+      stepName: 'Open browser and enter URL',
+      actionDescription: 'URL entered successfully',
+      status: 'Pass'
+    });
+
+    // Step 2: Enter User Name
+    cy.get('input[name="username"]').type('your-username');
+    cy.task('logStep', {
+      stepName: 'Enter User Name',
+      actionDescription: 'User Name entered successfully',
+      status: 'Pass'
+    });
+
+    // Step 3: Enter Password
+    cy.get('input[name="password"]').type('your-password');
+    cy.task('logStep', {
+      stepName: 'Enter Password',
+      actionDescription: 'Password entered successfully',
+      status: 'Pass'
+    });
+
+    // Step 4: Click Submit button
+    cy.get('button[type="submit"]').click();
+    cy.task('logStep', {
+      stepName: 'Click Submit button',
+      actionDescription: 'User is landed on home page screen',
+      status: 'Pass'
+    });
+
+  });
+
+});
+
+
+
 
 
 
