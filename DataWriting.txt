@@ -1488,6 +1488,61 @@ function appendRow(sheet, step, description, status) {
   row.commit(); // Commit the row to ensure it is properly written
 }
 
+@@ last @@
+describe('Logging Test Steps to Excel', () => {
+
+  it('Logs multiple test steps and results to Excel file', () => {
+
+    // Step 1: Visit the application
+    cy.visit('https://example.com').then(() => {
+      cy.log('Logging Step 1 to Excel');
+      cy.task('logTestStepToExcel', {
+        step: 'Step 1: Visit the application',
+        description: 'Navigated to https://example.com',
+        status: 'Passed'
+      });
+    });
+
+    // Step 2: Perform an assertion
+    cy.get('h1').should('contain', 'Example Domain').then(() => {
+      cy.log('Logging Step 2 to Excel');
+      cy.task('logTestStepToExcel', {
+        step: 'Step 2: Perform an assertion',
+        description: 'Verified the page contains "Example Domain" heading',
+        status: 'Passed'
+      });
+    });
+
+    // Step 3: Perform a failing assertion
+    cy.get('h1').should('contain', 'Non-existent Text').then(() => {
+      cy.log('Logging Step 3 to Excel');
+      cy.task('logTestStepToExcel', {
+        step: 'Step 3: Perform a failing assertion',
+        description: 'Verified the page contains "Non-existent Text"',
+        status: 'Failed'
+      });
+    }).catch((error) => {
+      cy.log('Logging Step 3 failure to Excel');
+      cy.task('logTestStepToExcel', {
+        step: 'Step 3: Perform a failing assertion',
+        description: 'Expected failure due to non-existent text',
+        status: 'Failed'
+      });
+      throw error; // Fail the test
+    });
+
+  });
+
+});
+
+
+logTestStepToExcel({ step, description, status }) {
+  console.log(`Logging test step to Excel: ${step}, ${description}, ${status}`);
+
+  // Existing logic for writing to the Excel file
+}
+
+
 
 
 
