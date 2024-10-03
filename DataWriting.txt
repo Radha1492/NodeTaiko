@@ -195,3 +195,691 @@ Email,FirstName,LastName,ClientName,GIT,AppName,Status
 
 This should eliminate any junk characters and ensure your application accepts the CSV file correctly. Let me know if this works for you!
 
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+To enhance your Cypress test reports with test steps and descriptions, you can take the following approaches:
+
+1. Using Mocha Hooks for Descriptive Steps:
+You can use before, beforeEach, it, describe, and afterEach hooks to define logical steps and provide meaningful descriptions for each test in your Cypress scripts. Here’s how you can structure your tests to improve clarity in reports:
+
+describe('Login Test Suite', () => {
+    
+    before(() => {
+        // This runs once before all tests in this block
+        cy.log('Setting up preconditions like navigating to the login page');
+    });
+
+    beforeEach(() => {
+        // This runs before each test
+        cy.visit('/login');
+    });
+
+    it('should allow the user to log in with valid credentials', () => {
+        cy.log('Step 1: Enter valid username and password');
+        cy.get('#username').type('user1');
+        cy.get('#password').type('password1');
+        
+        cy.log('Step 2: Click on the login button');
+        cy.get('#loginBtn').click();
+        
+        cy.log('Step 3: Verify the user is redirected to the homepage');
+        cy.url().should('include', '/home');
+    });
+
+    afterEach(() => {
+        // This runs after each test
+        cy.log('Test execution completed');
+    });
+});
+
+
+The cy.log() commands help you add descriptive steps directly into your test execution, which will be displayed in your test report. When the tests run, these steps will appear in your command log, making the report more meaningful for your QA team.
+
+2. Leverage Cypress Mochawesome Report:
+If you're already using Mochawesome for reporting, you can modify your tests to ensure that each step is clearly described in the report. Mochawesome provides a detailed view, including the logs you set in the test code, so the cy.log() commands will be visible.
+
+Install Mochawesome and necessary dependencies:
+
+npm install --save-dev mochawesome mochawesome-merge mochawesome-report-generator
+
+Update cypress.config.js to include mochawesome as the reporter:
+
+const { defineConfig } = require("cypress");
+
+module.exports = defineConfig({
+  reporter: 'mochawesome',
+  reporterOptions: {
+    reportDir: 'cypress/reports',
+    overwrite: false,
+    html: true,
+    json: true,
+  },
+});
+
+Run your Cypress tests, and you'll get a detailed report that includes the steps and descriptions.
+3. Allure Reports for Detailed Step Reporting:
+Allure Reports offer a more advanced way to show steps, logs, and test descriptions. You can use the Cypress Allure Plugin to enhance the level of detail in your test reports, showing each step clearly.
+
+Steps to Implement Allure with Cypress:
+Install Allure Reporter:
+
+Install the necessary plugins and dependencies:
+
+npm install --save-dev @shelex/cypress-allure-plugin
+npm install --save-dev allure-commandline
+
+Update cypress.config.js to configure the Allure plugin:
+
+const { defineConfig } = require("cypress");
+
+module.exports = defineConfig({
+  reporter: 'junit',
+  reporterOptions: {
+    mochaFile: 'cypress/reports/results-[hash].xml',
+    toConsole: true,
+  },
+  e2e: {
+    setupNodeEvents(on, config) {
+      require('@shelex/cypress-allure-plugin/writer')(on, config);
+      return config;
+    },
+  },
+});
+
+Add Allure Annotations in Your Test:
+
+In your test cases, you can add detailed steps and descriptions using Allure commands:
+
+describe('Login Test Suite', () => {
+    it('should allow the user to log in with valid credentials', () => {
+        allure.startStep('Step 1: Enter valid username and password');
+        cy.get('#username').type('user1');
+        cy.get('#password').type('password1');
+        allure.endStep();
+        
+        allure.startStep('Step 2: Click on the login button');
+        cy.get('#loginBtn').click();
+        allure.endStep();
+
+        allure.startStep('Step 3: Verify the user is redirected to the homepage');
+        cy.url().should('include', '/home');
+        allure.endStep();
+    });
+});
+
+Generate the Allure Report:
+
+After running your tests, generate the Allure report with:
+
+allure generate allure-results --clean -o allure-report
+allure open allure-report
+
+This will generate a detailed report with all steps and descriptions visible.
+
+4. Custom Reporter to Add Descriptions:
+You can also implement a custom reporter if you need more control over the content in your reports. Cypress supports custom reporters, and you can define additional behavior to log each step with more detail.
+
+5. Add Assertions for Better Reporting:
+Another key to enhancing report quality is adding descriptive assertions to the tests. For example, instead of just asserting a URL, make sure to add a meaningful message that will reflect in your reports:
+
+cy.url().should('include', '/home', 'Verify user is redirected to the homepage');
+
+This assertion message will show up in the reports, giving manual testers more confidence in what is being validated.
+
+Conclusion:
+By using detailed test steps, logs, screenshots, and enhanced reporting plugins like Mochawesome or Allure, you can provide the manual QA team with more confidence in the automation results. The richer and more descriptive the report, the easier it will be for the manual QA team to trust the output of your automation tests.
+
+
+can you share how reports look for mochawesome and allure
+ChatGPT said:
+ChatGPT
+Sure! Here's a brief overview of how Mochawesome and Allure reports look and how they help improve the clarity of your test results.
+
+1. Mochawesome Report:
+Mochawesome reports are clean and visually appealing, with the following elements:
+
+Summary Section: At the top, you'll see an overall test summary, showing the total number of tests, passed/failed tests, and skipped tests.
+Test Details: Each test case is listed along with its status (pass/fail). You can expand each test case to see detailed logs, including the step-by-step execution and any assertions made.
+Screenshots: If configured, screenshots of each test case or failed test steps can be embedded into the report.
+Error Messages: For failed test cases, you'll see detailed error messages and stack traces, helping with debugging.
+Example Screenshot of a Mochawesome Report:
+
+Test Suite & Case: Displays a structured view of test suites and test cases.
+Pass/Fail Indicators: Clear indicators for the status of each test (green for pass, red for fail).
+Command Logs: Each Cypress command is logged in sequence, showing interactions with the application.
+How to Improve Mochawesome Reports:
+cy.log() Commands: Any log messages you include in your tests with cy.log() will appear as part of the test's command logs, improving visibility into each step.
+Screenshots on Failure: Automatically include screenshots for failed steps using cy.screenshot().
+2. Allure Report:
+Allure reports are even more detailed and come with additional features for tracking test execution over time:
+
+Dashboard: Provides a summary of test executions, including pass/fail status, execution time, and test distribution (how many tests passed/failed/skipped over time).
+Step Details: Each test case is expanded into individual steps, showing exactly what was performed. These steps are customizable with allure.startStep() and allure.endStep() for clear breakdowns.
+Attachments: Screenshots, logs, and even custom artifacts like videos can be attached to each step, making it easy to investigate failures.
+Defect Tracking: Allure allows you to categorize failures into known issues, new defects, or potential bugs, making it useful for both QA and management.
+Example Screenshot of an Allure Report:
+
+Overview: The initial view shows an overall summary with key metrics like the number of passed/failed tests, execution trends, and failure analysis.
+Step-by-Step Execution: Each test case is broken down into steps, with logs and screenshots attached to every step. You can drill into any test case to see the exact sequence of actions.
+Detailed Logs: Similar to Mochawesome, logs for each test step are visible, providing rich information for both passed and failed tests.
+Allure Report Features:
+Step Annotations: Allure supports detailed step-by-step reporting, allowing you to see exactly which actions were taken during each test.
+Graphs and Trends: Allure generates visual reports, including trends of test execution, to see how the health of the application evolves over time.
+Screenshots & Logs: Detailed logs and screenshots can be added at each test step.
+Comparison:
+Feature	Mochawesome	Allure
+Look and Feel	Clean and simple UI with expandable sections	Modern UI with dashboards, graphs, and trends
+Test Logs	Provides a log for each test step, including cy.log() messages	Detailed step-by-step execution with the ability to attach logs and screenshots at every step
+Screenshots	Screenshots for failed tests or specific steps can be attached	Screenshots, logs, and custom artifacts can be attached to each step
+Execution Metrics	Simple pass/fail counts with optional execution time	Trend analysis, execution times, and defect categorization
+Defect Management	Basic pass/fail reporting	Advanced defect tracking and categorization of failures
+How to Integrate:
+Both Mochawesome and Allure can greatly enhance your reporting quality, helping manual testers and stakeholders gain more confidence in automation by seeing detailed test execution data and logs. Here's a quick recap of integration for each:
+
+Mochawesome:
+
+Integrate by setting up mochawesome as a reporter in Cypress.
+Use cy.log() to add descriptive test steps.
+Automatically capture screenshots on failures for visual verification.
+Allure:
+
+Install Allure plugin and configure the cypress.config.js file.
+Use Allure annotations like allure.startStep() and allure.endStep() to break down each test into meaningful steps.
+Generate detailed step-by-step reports with screenshots and logs.
+Both tools will significantly improve your reporting and help manual testers better understand the results of automation tests.
+
+@@@@@
+
+Instead of having in test report I want to create a separate file where I can Add Test Steps and Descriptions and status dynamically with date time stamp. how I can do this ?
+ChatGPT said:
+ChatGPT
+To create a separate file where you can dynamically log test steps, descriptions, and statuses (along with timestamps) during Cypress test execution, you can follow this approach:
+
+Steps to Create a Custom Log File
+Use Node.js File System (fs) Module: Cypress allows interaction with the Node.js fs (file system) module. You can use this to create or append logs to a custom file.
+
+Create a Task in setupNodeEvents: You'll need to define a custom task in the cypress.config.js file that handles writing to the log file. This task will be invoked from your test scripts whenever you want to log a test step, description, status, and timestamp.
+
+Implementation:
+Step 1: Add fs Module and Define a Task in cypress.config.js
+In your cypress.config.js, define a new task for writing to a log file:
+
+const fs = require('fs');
+const path = require('path');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStep({ message }) {
+          // Define the log file path
+          const logFilePath = path.join(__dirname, 'test-steps-log.txt');
+          
+          // Create a timestamp for when the log is created
+          const timestamp = new Date().toISOString();
+          
+          // Define the log format
+          const logEntry = `[${timestamp}] ${message}\n`;
+
+          // Append the log entry to the file
+          fs.appendFileSync(logFilePath, logEntry);
+
+          return null; // Cypress requires a return value for tasks
+        },
+      });
+    },
+  },
+};
+
+
+This script does the following:
+
+Uses fs.appendFileSync() to append each log entry to a file called test-steps-log.txt.
+Prepends the log entry with a timestamp (formatted in ISO 8601).
+Step 2: Create a Function to Log Test Steps in Your Cypress Tests
+Now that you've defined the logTestStep task, you can call it from your test files. Here’s an example:
+
+describe('Test with Custom Logging', () => {
+  it('performs some steps and logs them', () => {
+    
+    // Log test step 1
+    cy.task('logTestStep', { message: 'Test Step 1: Logging into the application - Passed' });
+
+    // Example test step
+    cy.visit('https://example.com');
+    
+    // Log test step 2
+    cy.task('logTestStep', { message: 'Test Step 2: Visited the homepage - Passed' });
+
+    // Example test step
+    cy.get('#loginButton').click();
+    
+    // Log test step 3
+    cy.task('logTestStep', { message: 'Test Step 3: Clicked login button - Passed' });
+
+    // Example assertion
+    cy.get('#welcomeMessage').should('contain', 'Welcome');
+
+    // Log test step 4
+    cy.task('logTestStep', { message: 'Test Step 4: Verified welcome message - Passed' });
+  });
+});
+
+
+Step 3: Run Your Cypress Tests
+Each time you call cy.task('logTestStep', ...), Cypress will append the message to the test-steps-log.txt file in the root of your project directory.
+Step 4: View the Log File
+After running your tests, you'll see the test-steps-log.txt file in the root of your Cypress project. It will look something like this:
+
+[2024-09-26T10:30:15.123Z] Test Step 1: Logging into the application - Passed
+[2024-09-26T10:31:12.456Z] Test Step 2: Visited the homepage - Passed
+[2024-09-26T10:31:30.789Z] Test Step 3: Clicked login button - Passed
+[2024-09-26T10:32:00.111Z] Test Step 4: Verified welcome message - Passed
+
+
+Additional Enhancements:
+Add More Information:
+
+You can include more details such as test name, test suite, and any custom metadata like environment info.
+Log Errors:
+
+You can add a try/catch block around test steps to log errors or failed steps. Example:
+
+cy.task('logTestStep', { message: 'Test Step: Action failed - Error' });
+
+Create Logs for Each Test File:
+
+Modify the log file path dynamically for each test suite or test case, e.g., using the test case name to create a separate log file for each test:
+const logFilePath = path.join(__dirname, `logs/${testFileName}-log.txt`);
+
+Conclusion:
+By following this approach, you can dynamically create a separate log file during your test execution, containing detailed descriptions of test steps, statuses, and timestamps. This will provide better visibility to the manual QA team, and it can also be used as a backup for test reports.
+
+Instead of .txt file I want to use excel file
+ChatGPT said:
+ChatGPT
+To log test steps, descriptions, and statuses with a timestamp dynamically in an Excel file, you can achieve this by using the xlsx library in Cypress. Here's how you can modify the solution to write the logs into an Excel file.
+
+Steps to Create and Update an Excel File:
+Install xlsx Library: The xlsx library will allow you to create and update Excel files. You can install it in your Cypress project using npm.
+
+Run the following command in your project directory:
+
+npm install xlsx
+
+Create a Task in cypress.config.js: Define a custom task in the cypress.config.js file to write logs to an Excel file using the xlsx library.
+
+Implementation
+Step 1: Add xlsx and Define Task in cypress.config.js
+In your cypress.config.js, configure a task to write the test steps and other details to an Excel file:
+
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Create a new workbook or load the existing one
+          let workbook;
+          if (fs.existsSync(logFilePath)) {
+            // Load existing workbook
+            workbook = xlsx.readFile(logFilePath);
+          } else {
+            // Create a new workbook
+            workbook = xlsx.utils.book_new();
+          }
+
+          // Get the current date and time for logging
+          const timestamp = new Date().toLocaleString();
+
+          // Get or create a worksheet
+          const sheetName = 'Test Steps Log';
+          let worksheet;
+          if (workbook.SheetNames.includes(sheetName)) {
+            worksheet = workbook.Sheets[sheetName];
+          } else {
+            worksheet = xlsx.utils.aoa_to_sheet([['Timestamp', 'Step', 'Description', 'Status']]);
+            xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+          }
+
+          // Convert worksheet data to JSON to append new rows
+          const sheetData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+          sheetData.push([timestamp, step, description, status]);
+
+          // Convert the updated JSON back to a worksheet and update the workbook
+          const newWorksheet = xlsx.utils.aoa_to_sheet(sheetData);
+          workbook.Sheets[sheetName] = newWorksheet;
+
+          // Write back to the Excel file
+          xlsx.writeFile(workbook, logFilePath);
+
+          return null;
+        },
+      });
+    },
+  },
+};
+
+This code does the following:
+
+It checks if the Excel file exists. If it does, it loads it; if not, it creates a new file.
+It creates a new worksheet or loads the existing one.
+It logs the timestamp, step, description, and status of each test step as a new row in the Excel file.
+Step 2: Log Test Steps in Cypress Test Files
+Now, from your Cypress test files, you can call this task to log each test step dynamically:
+
+describe('Test with Excel Logging', () => {
+  it('logs steps and status to Excel', () => {
+    // Log Test Step 1
+    cy.task('logTestStepToExcel', { 
+      step: 'Step 1', 
+      description: 'Logging into the application', 
+      status: 'Passed' 
+    });
+
+    // Example test step
+    cy.visit('https://example.com');
+    
+    // Log Test Step 2
+    cy.task('logTestStepToExcel', { 
+      step: 'Step 2', 
+      description: 'Visited the homepage', 
+      status: 'Passed' 
+    });
+
+    // Log Test Step 3
+    cy.get('#loginButton').click().then(() => {
+      cy.task('logTestStepToExcel', { 
+        step: 'Step 3', 
+        description: 'Clicked login button', 
+        status: 'Passed' 
+      });
+    });
+
+    // Example assertion
+    cy.get('#welcomeMessage').should('contain', 'Welcome').then(() => {
+      cy.task('logTestStepToExcel', { 
+        step: 'Step 4', 
+        description: 'Verified welcome message', 
+        status: 'Passed' 
+      });
+    });
+  });
+});
+
+Step 3: Run Your Cypress Tests
+As your Cypress tests run, the test steps, descriptions, status, and timestamps will be logged into the test-steps-log.xlsx file in the root of your project directory.
+
+Excel Log Output
+When you open the Excel file after test execution, it will look like this:
+
+Timestamp	Step	Description	Status
+2024-09-26 11:10:30	Step 1	Logging into the application	Passed
+2024-09-26 11:12:00	Step 2	Visited the homepage	Passed
+2024-09-26 11:12:30	Step 3	Clicked login button	Passed
+2024-09-26 11:13:00	Step 4	Verified welcome message	Passed
+Additional Enhancements:
+Log Errors: You can also log errors by modifying the status field for failed test steps.
+
+Different Worksheets for Each Test Suite: You could modify the task to create a new worksheet for each test suite or test file by dynamically naming the worksheet based on the test name.
+
+Conditional Logging: Add conditional logging based on the environment or the criticality of the steps.
+
+Conclusion:
+This approach will dynamically log your Cypress test steps, descriptions, statuses, and timestamps into an Excel file, which you can share with your manual QA team for better transparency and confidence in the automation results.
+
+
+
+
+
+
+Here status Passed I want to show with Green color and Fail with red color
+ChatGPT said:
+ChatGPT
+To display "Passed" in green and "Failed" in red within the Excel file, you can use the xlsx library's cell styling capabilities. Here's how you can enhance the solution to include conditional formatting for the status:
+
+Steps to Add Conditional Formatting (Green for "Passed", Red for "Failed"):
+Install xlsx-style Library: The default xlsx library doesn't support styling, but you can use xlsx-style for that. Install it by running the following command:
+
+npm install xlsx-style
+
+Modify the Task to Apply Styles: Update the cypress.config.js file to use xlsx-style and apply cell styles based on the status.
+
+Implementation
+Step 1: Modify cypress.config.js with xlsx-style
+
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx-style');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Create or load workbook
+          let workbook;
+          if (fs.existsSync(logFilePath)) {
+            workbook = xlsx.readFile(logFilePath);
+          } else {
+            workbook = xlsx.utils.book_new();
+          }
+
+          // Create or load worksheet
+          const sheetName = 'Test Steps Log';
+          let worksheet;
+          if (workbook.SheetNames.includes(sheetName)) {
+            worksheet = workbook.Sheets[sheetName];
+          } else {
+            worksheet = xlsx.utils.aoa_to_sheet([['Timestamp', 'Step', 'Description', 'Status']]);
+            xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+          }
+
+          // Get the current date and time
+          const timestamp = new Date().toLocaleString();
+
+          // Convert worksheet data to JSON to append new rows
+          const sheetData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+          sheetData.push([timestamp, step, description, status]);
+
+          // Convert the updated JSON back to a worksheet and update the workbook
+          const newWorksheet = xlsx.utils.aoa_to_sheet(sheetData);
+          
+          // Style the status column based on the status value
+          const statusRow = sheetData.length; // New row number
+          const statusCell = `D${statusRow}`; // Status column 'D'
+
+          newWorksheet[statusCell].s = {
+            font: {
+              color: { rgb: status === 'Passed' ? '00FF00' : 'FF0000' } // Green for Passed, Red for Failed
+            }
+          };
+
+          workbook.Sheets[sheetName] = newWorksheet;
+
+          // Write back to the Excel file
+          xlsx.writeFile(workbook, logFilePath);
+
+          return null;
+        },
+      });
+    },
+  },
+};
+
+Explanation:
+Conditional Font Color:
+The font color for the "Passed" status is set to green (rgb: '00FF00').
+The font color for the "Failed" status is set to red (rgb: 'FF0000').
+The statusCell refers to the cell in the status column, dynamically applying the correct style for the specific row.
+Step 2: Use the Task in Test Files
+You can log the test steps in the same way, but now the status will be colored accordingly in the Excel file:
+
+describe('Test with Excel Logging', () => {
+  it('logs steps and status to Excel with color formatting', () => {
+    cy.task('logTestStepToExcel', { 
+      step: 'Step 1', 
+      description: 'Logging into the application', 
+      status: 'Passed' // This will be green in Excel
+    });
+
+    cy.task('logTestStepToExcel', { 
+      step: 'Step 2', 
+      description: 'Login failed due to incorrect credentials', 
+      status: 'Failed' // This will be red in Excel
+    });
+  });
+});
+
+Result in Excel:
+When you open the Excel file, the "Status" column will now have the following colors:
+
+"Passed" in green.
+"Failed" in red.
+Timestamp	Step	Description	Status
+2024-09-26 11:10:30	Step 1	Logging into the application	Passed (Green)
+2024-09-26 11:12:00	Step 2	Login failed due to incorrect credentials	Failed (Red)
+Conclusion:
+This approach enhances the logging system by adding dynamic status-based color coding for the test results in the Excel file. The "Passed" status will appear in green, and "Failed" will appear in red, making the test report more readable and informative for the manual QA team.
+
+How I can add charts and dashboard in this excel file
+ChatGPT said:
+ChatGPT
+To add charts and dashboards in the Excel file where you log test steps, descriptions, and statuses dynamically, you can use a combination of xlsx for data manipulation and exceljs for more advanced features like chart creation. Unfortunately, xlsx-style doesn't support creating charts directly, so you would need to use exceljs to handle these additional functionalities.
+
+Here's a step-by-step guide on how to use exceljs to achieve this:
+
+Step 1: Install exceljs
+First, you need to install the exceljs package, which supports both Excel file creation and charting.
+
+
+npm install exceljs
+
+Step 2: Modify the Cypress task to Use exceljs
+const fs = require('fs');
+const path = require('path');
+const ExcelJS = require('exceljs');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Initialize a new workbook or open an existing one
+          let workbook = new ExcelJS.Workbook();
+          if (fs.existsSync(logFilePath)) {
+            // Load existing file if it exists
+            return workbook.xlsx.readFile(logFilePath).then(() => {
+              addTestStep(workbook, step, description, status);
+            });
+          } else {
+            // Create new workbook and sheet
+            const sheet = workbook.addWorksheet('Test Steps Log');
+            sheet.columns = [
+              { header: 'Timestamp', key: 'timestamp', width: 25 },
+              { header: 'Step', key: 'step', width: 15 },
+              { header: 'Description', key: 'description', width: 40 },
+              { header: 'Status', key: 'status', width: 10 },
+            ];
+            return addTestStep(workbook, step, description, status);
+          }
+        },
+      });
+    },
+  },
+};
+
+// Function to add test steps to the workbook
+async function addTestStep(workbook, step, description, status) {
+  const sheet = workbook.getWorksheet('Test Steps Log');
+  
+  // Append new row
+  const timestamp = new Date().toLocaleString();
+  const row = sheet.addRow({ timestamp, step, description, status });
+
+  // Color "Passed" green and "Failed" red
+  if (status === 'Passed') {
+    row.getCell('status').font = { color: { argb: 'FF00FF00' } }; // Green
+  } else if (status === 'Failed') {
+    row.getCell('status').font = { color: { argb: 'FFFF0000' } }; // Red
+  }
+
+  // Create a chart on the second sheet (Dashboard)
+  createChart(workbook, sheet);
+
+  // Save workbook to file
+  await workbook.xlsx.writeFile(path.join(__dirname, 'test-steps-log.xlsx'));
+}
+
+// Function to create a chart (Pie or Bar Chart)
+function createChart(workbook, sheet) {
+  // Get status data (Passed/Failed count)
+  const passedCount = sheet.getColumn('status').values.filter(val => val === 'Passed').length;
+  const failedCount = sheet.getColumn('status').values.filter(val => val === 'Failed').length;
+
+  // Create a dashboard sheet if it doesn't exist
+  let dashboardSheet = workbook.getWorksheet('Dashboard');
+  if (!dashboardSheet) {
+    dashboardSheet = workbook.addWorksheet('Dashboard');
+  }
+
+  // Clear any existing chart data
+  dashboardSheet.getRows(1, dashboardSheet.rowCount).forEach(row => row.remove());
+
+  // Add data for the chart
+  dashboardSheet.addRow(['Status', 'Count']);
+  dashboardSheet.addRow(['Passed', passedCount]);
+  dashboardSheet.addRow(['Failed', failedCount]);
+
+  // (Pseudo code) Add charting logic (ExcelJS doesn't support charts directly, you may need a workaround)
+  // Create Pie or Bar Chart here using ExcelJS charting functions.
+  // The actual implementation of charting may need manual creation in Excel.
+
+  // Alternatively, the following can be done manually to create visualizations:
+  // - Open the Excel file, create a chart in Excel using the data.
+  // - Alternatively, use a reporting tool that can handle both data and charts.
+}
+
+Step 3: Explanation
+Workbook and Worksheet:
+
+The workbook is created or loaded based on the existing Excel file.
+The test steps are logged to the "Test Steps Log" worksheet.
+Chart Creation:
+
+A separate "Dashboard" sheet is created where the data for Passed/Failed test cases is stored.
+While exceljs does not directly support charts, you can organize the data in the "Dashboard" sheet and then manually create charts in Excel or use other charting libraries/tools to automate this.
+Excel Chart Limitation:
+
+As of now, exceljs doesn't natively support Excel charts. However, data preparation for a pie chart or bar chart can be done, and you can create the actual chart manually or by using a third-party tool. The script will log and store test data dynamically, which you can use for visualizations.
+Step 4: Generating the Report
+Whenever Cypress test cases run, this will log the test steps with a status in the test-steps-log.xlsx file and append the results in the Excel file. The "Dashboard" sheet will hold the summary of Passed/Failed tests.
+
+Example Data in "Dashboard" Sheet:
+Status	Count
+Passed	10
+Failed	2
+Final Step: Create Charts in Excel
+Once you open the Excel file, follow these steps to create a chart manually:
+
+Navigate to the "Dashboard" sheet.
+Highlight the Status and Count columns.
+Go to the "Insert" tab in Excel.
+Choose the chart type (e.g., Pie Chart, Bar Chart).
+Excel will generate a chart based on the data.
+Conclusion
+This solution logs data to an Excel file using exceljs, and while creating charts is not fully automated, it allows you to prepare the data dynamically. You can then use Excel's built-in charting features to create visual dashboards based on your testing results.
+
+
+
+
