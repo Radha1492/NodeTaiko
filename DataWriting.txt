@@ -1214,6 +1214,130 @@ describe('Automated Test with Excel Logging', () => {
   });
 });
 
+Here’s an updated approach to avoid that error and ensure that columns stay within the valid Excel range.
+
+const fs = require('fs');
+const path = require('path');
+const ExcelJS = require('exceljs');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Create a workbook or load existing one
+          let workbook = new ExcelJS.Workbook();
+          if (fs.existsSync(logFilePath)) {
+            return workbook.xlsx.readFile(logFilePath)
+              .then(() => {
+                const sheet = workbook.getWorksheet('Test Steps Log') || workbook.addWorksheet('Test Steps Log');
+
+                // Append row data with timestamp
+                appendRow(sheet, step, description, status);
+
+                // Save workbook
+                return workbook.xlsx.writeFile(logFilePath);
+              });
+          } else {
+            const sheet = workbook.addWorksheet('Test Steps Log');
+
+            // Add header with formatting
+            sheet.columns = [
+              { header: 'Timestamp', key: 'timestamp', width: 25 },
+              { header: 'Step', key: 'step', width: 30 },
+              { header: 'Description', key: 'description', width: 50 },
+              { header: 'Status', key: 'status', width: 10 }
+            ];
+
+            // Apply styles to the header
+            sheet.getRow(1).eachCell(cell => {
+              cell.font = { bold: true };
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF99CCFF' }, // Light blue fill
+              };
+            });
+
+            // Append first row data with timestamp
+            appendRow(sheet, step, description, status);
+
+            // Save workbook
+            return workbook.xlsx.writeFile(logFilePath);
+          }
+        }
+      });
+    }
+  }
+};
+
+// Helper function to append a row and apply color formatting for the status
+function appendRow(sheet, step, description, status) {
+  const timestamp = new Date().toLocaleString();
+  const row = sheet.addRow({ timestamp, step, description, status });
+
+  // Apply color formatting to the status column based on pass/fail
+  const statusCell = row.getCell(4); // Column 4 is the Status column
+  if (status === 'Passed') {
+    statusCell.font = { color: { argb: 'FF00FF00' } }; // Green for passed
+  } else if (status === 'Failed') {
+    statusCell.font = { color: { argb: 'FFFF0000' } }; // Red for failed
+  }
+
+  row.commit(); // Commit the row to ensure it is properly written
+}
+
+
+
+Here’s a sample test script file that you can use to call the cy.task('logTestStepToExcel', ...) from your Cypress tests.
+
+Test Script File (e.g., test_spec.js):
+
+describe('Excel Logging Test', () => {
+
+  // Log the step to Excel with relevant details (step, description, status)
+  const logTestStep = (step, description, status) => {
+    cy.task('logTestStepToExcel', { step, description, status });
+  };
+
+  it('Step 1: Open Application', () => {
+    // Example test step: Open the application
+    cy.visit('https://example.com');
+    logTestStep('Step 1: Open Application', 'Navigating to the application URL', 'Passed');
+  });
+
+  it('Step 2: Perform an assertion', () => {
+    // Example test step: Check for element existence
+    cy.get('h1').should('exist').then(() => {
+      logTestStep('Step 2: Perform an assertion', 'Verify if the header element exists on the page', 'Passed');
+    }).catch(() => {
+      logTestStep('Step 2: Perform an assertion', 'Header element does not exist', 'Failed');
+    });
+  });
+
+  it('Step 3: Click on a button', () => {
+    // Example test step: Click on a button
+    cy.get('button#submit').click().then(() => {
+      logTestStep('Step 3: Click on a button', 'Clicked the submit button', 'Passed');
+    }).catch(() => {
+      logTestStep('Step 3: Click on a button', 'Failed to click the submit button', 'Failed');
+    });
+  });
+
+  it('Step 4: Verify some functionality', () => {
+    // Example test step: Perform a different action
+    cy.url().should('include', '/dashboard').then(() => {
+      logTestStep('Step 4: Verify Dashboard', 'Verify the user is redirected to the dashboard', 'Passed');
+    }).catch(() => {
+      logTestStep('Step 4: Verify Dashboard', 'User is not redirected to the dashboard', 'Failed');
+    });
+  });
+
+});
+
+
 
 
 
