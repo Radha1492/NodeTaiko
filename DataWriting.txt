@@ -880,6 +880,287 @@ Excel will generate a chart based on the data.
 Conclusion
 This solution logs data to an Excel file using exceljs, and while creating charts is not fully automated, it allows you to prepare the data dynamically. You can then use Excel's built-in charting features to create visual dashboards based on your testing results.
 
+@@@@@@@@@@@@ error @@@@@@@@@@@@@@@
+The error you're encountering, xlsx.utils.book_new is not a function, occurs because the library you're using, xlsx-style, might not fully support the same API as the xlsx library, and it may be outdated. The xlsx-style library was a fork to handle cell styling in Excel files, but it's no longer actively maintained. It would be better to switch to the xlsx package, which now supports styling using a separate plugin or workarounds.
+
+Solution
+Switch to the xlsx library:
+
+First, ensure you have the correct xlsx package installed by running:
+npm install xlsx
+
+Add Styles Using xlsx with Workarounds:
+
+The basic xlsx library doesn't have full styling support out of the box, but there are workarounds or plugins like xlsx-style if you need advanced styling (though some functionality may differ).
+Here's how to update the code to work with the standard xlsx library:
+
+Updated Code Using xlsx:
+const fs = require('fs');
+const path = require('path');
+const XLSX = require('xlsx');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Create or load workbook
+          let workbook;
+          if (fs.existsSync(logFilePath)) {
+            workbook = XLSX.readFile(logFilePath);
+          } else {
+            workbook = XLSX.utils.book_new(); // Creates a new workbook
+          }
+
+          // Create or load worksheet
+          const sheetName = 'Test Steps Log';
+          let worksheet;
+          if (workbook.SheetNames.includes(sheetName)) {
+            worksheet = workbook.Sheets[sheetName];
+          } else {
+            worksheet = XLSX.utils.aoa_to_sheet([['Timestamp', 'Step', 'Description', 'Status']]);
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+          }
+
+          // Get the current date and time
+          const timestamp = new Date().toLocaleString();
+
+          // Convert worksheet data to JSON to append new rows
+          const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          sheetData.push([timestamp, step, description, status]);
+
+          // Convert the updated JSON back to a worksheet and update the workbook
+          const newWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
+          workbook.Sheets[sheetName] = newWorksheet;
+
+          // Write back to the Excel file
+          XLSX.writeFile(workbook, logFilePath);
+
+          return null;
+        },
+      });
+    },
+  },
+};
+
+Note:
+If you need to add more advanced styling, you'll have to use a combination of xlsx and custom logic (or use a library that supports styling like xlsx-style more effectively).
+
+For basic reporting functionality, the xlsx package should work as expected without needing styling at this stage. Let me know if you require advanced styling, and I can guide you through alternative solutions.
+
+
+
+
+
+
+You said:
+Can you show me how excel report will look like
+
+Here is how your Excel report would look, with columns for Timestamp, Step, Description, and Status. The "Passed" statuses are highlighted in green, and "Failed" statuses in red, making the test results visually clear and easy to read.
+
+The code you provided will produce an Excel file named test-steps-log.xlsx, which will contain four columns: Timestamp, Step, Description, and Status. The file will log test steps dynamically as they occur, including the timestamp when each step was logged, the step name, a description, and the test result (status: "Passed" or "Failed").
+
+Here’s a breakdown of the flow:
+
+File Handling: If the file already exists, it will be read. If it doesn’t, a new one will be created.
+Sheet Handling: If the sheet "Test Steps Log" exists, it appends to it. If it doesn’t, a new sheet is created with headers.
+Adding Data: Each time you log a step, it appends a new row with the timestamp, step, description, and status to the sheet.
+Save to File: Finally, it saves the updated workbook back to the Excel file.
+Output Example:
+
+Timestamp | Step | Description | Status
+10/03/2024 11:00:01 | Login | User logs into the application | Passed
+10/03/2024 11:05:15 | Upload | User uploads a file | Failed
+However, this code doesn't include any conditional formatting for the "Status" column. If you want to style the cells (like coloring "Passed" in green and "Failed" in red), you would need to use a library like xlsx-style or a similar method to format the cells after the data is written.
+
+Would you like to add styling or any other customizations to this code?
+
+In the Output Example header Timestamp | Step | Description | Status I want to make with bold and highlighted with blue color
+
+To achieve the formatting where the header row (Timestamp, Step, Description, Status) is bold and highlighted with a blue background in your Excel file, you can use the xlsx-style library (instead of xlsx, which doesn't support cell styling).
+
+Below is an updated version of your code that applies bold formatting and a blue background color to the header row.
+
+Updated Code with Header Formatting:
+
+const fs = require('fs');
+const path = require('path');
+const XLSX = require('xlsx-style'); // Ensure you're using xlsx-style for cell styling
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Create or load workbook
+          let workbook;
+          if (fs.existsSync(logFilePath)) {
+            workbook = XLSX.readFile(logFilePath);
+          } else {
+            workbook = XLSX.utils.book_new(); // Creates a new workbook
+          }
+
+          // Create or load worksheet
+          const sheetName = 'Test Steps Log';
+          let worksheet;
+          if (workbook.SheetNames.includes(sheetName)) {
+            worksheet = workbook.Sheets[sheetName];
+          } else {
+            // Create a new worksheet with headers
+            worksheet = XLSX.utils.aoa_to_sheet([['Timestamp', 'Step', 'Description', 'Status']]);
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+            // Apply formatting to header row
+            const headerRange = ['A1', 'B1', 'C1', 'D1']; // Header cells
+
+            headerRange.forEach((cell) => {
+              worksheet[cell].s = {
+                font: { bold: true }, // Make the font bold
+                fill: { bgColor: { rgb: "0000FF" }, fgColor: { rgb: "0000FF" } }, // Blue background
+                alignment: { horizontal: "center" }, // Center align the text
+              };
+            });
+          }
+
+          // Get the current date and time
+          const timestamp = new Date().toLocaleString();
+
+          // Convert worksheet data to JSON to append new rows
+          const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          sheetData.push([timestamp, step, description, status]);
+
+          // Convert the updated JSON back to a worksheet and update the workbook
+          const newWorksheet = XLSX.utils.aoa_to_sheet(sheetData);
+          workbook.Sheets[sheetName] = newWorksheet;
+
+          // Write back to the Excel file
+          XLSX.writeFile(workbook, logFilePath);
+
+          return null;
+        },
+      });
+    },
+  },
+};
+
+Key Changes:
+Bold and Blue Header:
+I added a section that applies styling to the header row. The cells in the header (A1 to D1) will be bold and have a blue background color (rgb: "0000FF").
+Center Alignment:
+The header text is center-aligned for better visibility.
+Notes:
+The xlsx-style library supports cell styling like font changes and background colors, which is why it's used here instead of the standard xlsx.
+If you're not familiar with xlsx-style, make sure it's installed by running:
+bash
+
+npm install xlsx-style
+
+
+This will ensure that the header row is bold, center-aligned, and highlighted in blue, while subsequent rows will contain your test step data dynamically.
+
+xlsx-style is not working any other workaround ?
+If xlsx-style is not working, you can switch to using a combination of xlsx (for data handling) and a more feature-rich library like exceljs, which supports rich formatting options like bold text and background colors.
+
+Here's a workaround using the exceljs library, which allows you to apply cell formatting, including bold text, color highlighting, and more.
+
+Install exceljs:
+First, you need to install exceljs by running:
+npm install exceljs
+
+const fs = require('fs');
+const path = require('path');
+const ExcelJS = require('exceljs');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        async logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          const workbook = new ExcelJS.Workbook();
+          
+          // Check if file exists
+          if (fs.existsSync(logFilePath)) {
+            await workbook.xlsx.readFile(logFilePath); // Load existing workbook
+          } else {
+            // Create a new workbook if it doesn't exist
+            const sheet = workbook.addWorksheet('Test Steps Log');
+
+            // Add header row with styling
+            sheet.columns = [
+              { header: 'Timestamp', key: 'timestamp', width: 25 },
+              { header: 'Step', key: 'step', width: 30 },
+              { header: 'Description', key: 'description', width: 40 },
+              { header: 'Status', key: 'status', width: 15 },
+            ];
+
+            // Apply styles to the header row
+            sheet.getRow(1).eachCell((cell) => {
+              cell.font = { bold: true }; // Make the font bold
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF0000FF' }, // Blue background
+                bgColor: { argb: 'FF0000FF' },
+              };
+              cell.alignment = { horizontal: 'center' }; // Center-align the text
+              cell.font = { color: { argb: 'FFFFFFFF' }, bold: true }; // White text
+            });
+          }
+
+          const sheet = workbook.getWorksheet('Test Steps Log');
+
+          // Get the current date and time
+          const timestamp = new Date().toLocaleString();
+
+          // Add the test step data to the worksheet
+          const row = sheet.addRow({
+            timestamp,
+            step,
+            description,
+            status,
+          });
+
+          // Apply styles to the status cell
+          const statusCell = row.getCell('status');
+          statusCell.font = { color: { argb: status === 'Passed' ? 'FF00FF00' : 'FFFF0000' } }; // Green for Passed, Red for Failed
+
+          // Save the workbook to the file
+          await workbook.xlsx.writeFile(logFilePath);
+
+          return null;
+        },
+      });
+    },
+  },
+};
+
+Key Features:
+ExcelJS Library:
+
+This uses exceljs, which supports advanced features like cell formatting, custom fonts, and color schemes.
+Header Styling:
+
+The header row is styled with bold text, a blue background, and white font.
+The header text is center-aligned for clarity.
+Dynamic Data:
+
+Test steps are dynamically added to the Excel file, and the status cell is colored green (Passed) or red (Failed).
+Steps:
+Install exceljs:
+Run npm install exceljs to get started.
+Run Your Test:
+When the task logTestStepToExcel is triggered, it will either create or update the Excel file and apply the necessary formatting.
+
+Final Output:
+The Excel file will have a formatted header row with the following columns: Timestamp, Step, Description, and Status.
+The status will be color-coded dynamically: green for "Passed" and red for "Failed".
+
 
 
 
