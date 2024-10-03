@@ -1161,6 +1161,60 @@ Final Output:
 The Excel file will have a formatted header row with the following columns: Timestamp, Step, Description, and Status.
 The status will be color-coded dynamically: green for "Passed" and red for "Failed".
 
+QQQQQQ
+describe('Automated Test with Excel Logging', () => {
+  it('Performs some test steps and logs them in Excel', () => {
+    // Step 1: Visit a website
+    cy.visit('https://example.com')
+      .then(() => {
+        cy.task('logTestStepToExcel', {
+          step: 'Visit Example Website',
+          description: 'Navigated to https://example.com',
+          status: 'Passed', // Set status to 'Passed' for successful steps
+        });
+      });
+
+    // Step 2: Perform an assertion
+    cy.get('h1').should('contain.text', 'Example Domain')
+      .then(() => {
+        cy.task('logTestStepToExcel', {
+          step: 'Check Example Domain Text',
+          description: 'Verified that the page contains "Example Domain" text',
+          status: 'Passed',
+        });
+      });
+
+    // Step 3: Interact with a button (Simulating a failure)
+    cy.get('non-existent-button')
+      .click({ force: true }) // This will fail as the element doesn't exist
+      .then(() => {
+        cy.task('logTestStepToExcel', {
+          step: 'Click Non-Existent Button',
+          description: 'Attempted to click a non-existent button on the page',
+          status: 'Failed',
+        });
+      })
+      .catch((error) => {
+        cy.task('logTestStepToExcel', {
+          step: 'Click Non-Existent Button',
+          description: `Error: ${error.message}`, // Log the error message in case of failure
+          status: 'Failed',
+        });
+      });
+
+    // Step 4: Verify the page title
+    cy.title().should('include', 'Example Domain')
+      .then(() => {
+        cy.task('logTestStepToExcel', {
+          step: 'Verify Page Title',
+          description: 'Checked if the page title contains "Example Domain"',
+          status: 'Passed',
+        });
+      });
+  });
+});
+
+
 
 
 
