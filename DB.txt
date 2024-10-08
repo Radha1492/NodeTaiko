@@ -380,6 +380,60 @@ Excel Parsing:
 xlsx.utils.sheet_to_json(worksheet, { header: 1 }): This converts the sheet into a 2D array, where each inner array represents a row, and the first row is treated as headers (column names).
 This approach works similarly to the CSV validation, allowing you to download and validate Excel file contents against your application's UI. Let me know if you need further adjustments!
 
+@@@@
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+
+          // Create a new workbook or load the existing one
+          let workbook;
+          if (fs.existsSync(logFilePath)) {
+            // Load existing workbook
+            workbook = xlsx.readFile(logFilePath);
+          } else {
+            // Create a new workbook
+            workbook = xlsx.utils.book_new();
+          }
+
+          // Get or create a worksheet
+          const sheetName = 'Test Steps Log';
+          let worksheet;
+          if (workbook.SheetNames.includes(sheetName)) {
+            worksheet = workbook.Sheets[sheetName];
+          } else {
+            worksheet = xlsx.utils.aoa_to_sheet([['Timestamp', 'Step', 'Description', 'Status']]);
+            xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+          }
+
+          // Get the current date and time for logging
+          const timestamp = new Date().toLocaleString();
+
+          // Convert worksheet data to JSON to append new rows
+          const sheetData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+          sheetData.push([timestamp, step, description, status]);
+
+          // Convert the updated JSON back to a worksheet and update the workbook
+          const newWorksheet = xlsx.utils.aoa_to_sheet(sheetData);
+          workbook.Sheets[sheetName] = newWorksheet;
+
+          // Write back to the Excel file
+          xlsx.writeFile(workbook, logFilePath);
+
+          return null;
+        },
+      });
+    },
+  },
+};
+
+
 
 
 
