@@ -536,13 +536,112 @@ describe('Test Logging with Excel File', () => {
 });
 
 
+@@@@@ config @@@@@@
+const XLSX = require('xlsx');
+const fs = require('fs');
+
+module.exports = (on, config) => {
+  on('task', {
+    // Task to create a new Excel file with headers
+    createExcelFile({ filePath }) {
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([['Timestamp', 'ManualTC_ID', 'TestSteps', 'Actions', 'Status', 'AutomationTC_ID']]);
+
+      // Apply header styling (bold, blue color)
+      const headerStyle = { font: { bold: true, color: { rgb: "0000FF" } } };
+      ['A1', 'B1', 'C1', 'D1', 'E1', 'F1'].forEach(cell => {
+        if (!ws[cell]) return;
+        ws[cell].s = headerStyle;
+      });
+
+      // Append worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Test Log');
+
+      // Write workbook to file
+      XLSX.writeFile(wb, filePath);
+
+      return null; // Task must return something
+    },
+
+    // Task to add a log entry to the Excel file
+    addLogEntry({ filePath, logEntry }) {
+      const wb = XLSX.readFile(filePath);
+      const ws = wb.Sheets['Test Log'];
+
+      // Get the last row
+      const lastRow = XLSX.utils.sheet_to_json(ws, { header: 1 }).length;
+
+      // Add new row
+      const newRow = [
+        logEntry.Timestamp,
+        logEntry.ManualTC_ID,
+        logEntry.TestSteps,
+        logEntry.Actions,
+        logEntry.Status,
+        logEntry.AutomationTC_ID
+      ];
+
+      // Write status with conditional formatting (green for pass, red for fail)
+      const cellRef = `E${lastRow + 1}`;
+      ws[cellRef] = { v: logEntry.Status };
+      ws[cellRef].s = {
+        font: { color: { rgb: logEntry.Status === 'Pass' ? "00FF00" : "FF0000" } }
+      };
+
+      // Add the row to the sheet
+      XLSX.utils.sheet_add_aoa(ws, [newRow], { origin: -1 });
+
+      // Write the workbook back to the file
+      XLSX.writeFile(wb, filePath);
+
+      return null; // Task must return something
+    }
+  });
+};
 
 
+@@@
+describe('Test Logging with Excel File', () => {
+  const logFile = './cypress/logs/test-log.xlsx';
+  const testStartTime = new Date().toISOString().replace(/:/g, '-');
 
+  before(() => {
+    // Create a new Excel file before starting the test suite
+    cy.task('createExcelFile', { filePath: logFile });
+  });
 
+  it('Sample Test Case 1 - Pass', () => {
+    cy.log('Running Test Case 1');
+    
+    // Log the test result dynamically
+    cy.task('addLogEntry', {
+      filePath: logFile,
+      logEntry: {
+        Timestamp: testStartTime,
+        ManualTC_ID: 'TC001',
+        TestSteps: 'Step 1: Do something',
+        Actions: 'Action 1: Verify something',
+        Status: 'Pass',
+        AutomationTC_ID: 'AUTO_TC_001'
+      }
+    });
+  });
 
+  it('Sample Test Case 2 - Fail', () => {
+    cy.log('Running Test Case 2');
+    
+    // Log the test result dynamically
+    cy.task('addLogEntry', {
+      filePath: logFile,
+      logEntry: {
+        Timestamp: testStartTime,
+        ManualTC_ID: 'TC002',
+        TestSteps: 'Step 2: Do another thing',
+        Actions: 'Action 2: Validate failure',
+        Status: 'Fail',
+        AutomationTC_ID: 'AUTO_TC_002'
+      }
+    });
+  });
+});
 
-
-Logging step: Step 1: Visit the application, description: Navigated to https://example.com, status: Passed
-Logging step: Step 2: Perform an assertion, description: Verified the page contains "Example Domain" heading, status: Passed
-Logging step: Step 3: Perform a failing assertion, description: Expected failure due to non-existent text, status: Failed
