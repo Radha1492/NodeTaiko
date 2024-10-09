@@ -1,25 +1,64 @@
-describe('Intercept and mock GET request', () => {
-  beforeEach(() => {
-    // Intercept the GET request and mock the response
-    cy.intercept('GET', '/api/endpoint', {
-      statusCode: 200,
-      body: { key: 'mockedValue' },
-    }).as('getMockedData');
-    
-    // Visit the page that makes the GET request
-    cy.visit('/path-to-your-page');
-  });
+// Inside your cypress.config.js
+const fs = require('fs');
+const path = require('path');
+const ExcelJS = require('exceljs');
 
-  it('should display the mocked response', () => {
-    // Wait for the GET request to be intercepted
-    cy.wait('@getMockedData');
-    
-    // Verify that the mocked response is displayed on the page
-    cy.contains('mockedValue').should('be.visible');
-  });
-});
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+          const workbook = new ExcelJS.Workbook();
 
+          // Check if the file exists, if not create a new workbook
+          return fs.promises.access(logFilePath, fs.constants.F_OK)
+            .catch(() => {
+              // File does not exist, so we create a new one
+              const newSheet = workbook.addWorksheet('Test Steps Log');
+              newSheet.columns = [
+                { header: 'Timestamp', key: 'timestamp', width: 25 },
+                { header: 'Step', key: 'step', width: 50 },
+                { header: 'Description', key: 'description', width: 50 },
+                { header: 'Status', key: 'status', width: 15 }
+              ];
+              return workbook.xlsx.writeFile(logFilePath);
+            })
+            .then(() => {
+              return workbook.xlsx.readFile(logFilePath);
+            })
+            .then(() => {
+              const sheet = workbook.getWorksheet('Test Steps Log');
 
+              // Append row data with timestamp
+              appendRow(sheet, step, description, status);
 
+              // Save workbook
+              return workbook.xlsx.writeFile(logFilePath)
+                .then(() => null); // Return null to indicate task completion
+            })
+            .catch(err => {
+              console.error('Error reading or writing to Excel file:', err);
+              return null; // Return null to indicate task completion
+            });
+        }
+      });
+    }
+  }
+};
 
+// Helper function to append a row
+function appendRow(sheet, step, description, status) {
+  const timestamp = new Date().toLocaleString();
+  const row = sheet.addRow({ timestamp, step, description, status });
 
+  // Apply color formatting to the status column based on pass/fail
+  const statusCell = row.getCell(4); // Column 4 is the Status column
+  if (status === 'Passed') {
+    statusCell.font = { color: { argb: 'FF00FF00' } }; // Green for passed
+  } else if (status === 'Failed') {
+    statusCell.font = { color: { argb: 'FFFF0000' } }; // Red for failed
+  }
+
+  row.commit(); // Commit the row to ensure it is properly written
+}
