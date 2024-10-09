@@ -152,3 +152,96 @@ function appendRow(sheet, step, description, status) {
   row.commit(); // Commit the row to ensure it is properly written
 }
 
+@@@ @@@
+const fs = require('fs');
+const path = require('path');
+const ExcelJS = require('exceljs');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        logTestStepToExcel({ step, description, status }) {
+          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+          const workbook = new ExcelJS.Workbook();
+
+          // Create file if it doesn't exist and write headers
+          if (!fs.existsSync(logFilePath)) {
+            // Create a new workbook and sheet if file doesn't exist
+            const sheet = workbook.addWorksheet('Test Steps Log');
+
+            // Define columns and styles for headers
+            sheet.columns = [
+              { header: 'Timestamp', key: 'timestamp', width: 25 },
+              { header: 'Step', key: 'step', width: 30 },
+              { header: 'Description', key: 'description', width: 50 },
+              { header: 'Status', key: 'status', width: 10 }
+            ];
+
+            sheet.getRow(1).eachCell(cell => {
+              cell.font = { bold: true };
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF99CCFF' }, // Light blue fill
+              };
+            });
+
+            // Append the first row
+            appendRow(sheet, step, description, status);
+
+            // Save the workbook
+            return workbook.xlsx.writeFile(logFilePath)
+              .then(() => null); // Return null to indicate task completion
+
+          } else {
+            // If the file exists, directly load it without resetting data
+            return workbook.xlsx.readFile(logFilePath)
+              .then(() => {
+                let sheet = workbook.getWorksheet('Test Steps Log');
+
+                // In case the worksheet is missing, create one
+                if (!sheet) {
+                  sheet = workbook.addWorksheet('Test Steps Log');
+                  sheet.columns = [
+                    { header: 'Timestamp', key: 'timestamp', width: 25 },
+                    { header: 'Step', key: 'step', width: 30 },
+                    { header: 'Description', key: 'description', width: 50 },
+                    { header: 'Status', key: 'status', width: 10 }
+                  ];
+                }
+
+                // Append a new row each time the task is invoked
+                appendRow(sheet, step, description, status);
+
+                // Save workbook with appended data
+                return workbook.xlsx.writeFile(logFilePath)
+                  .then(() => null) // Task completed successfully
+                  .catch(err => {
+                    console.error('Error writing to Excel file:', err);
+                    return null; // Handle error gracefully
+                  });
+              });
+          }
+        }
+      });
+    }
+  }
+};
+
+// Helper function to append a row and apply color formatting for the status
+function appendRow(sheet, step, description, status) {
+  const timestamp = new Date().toLocaleString();
+  const row = sheet.addRow({ timestamp, step, description, status });
+
+  // Apply color formatting to the status column based on pass/fail
+  const statusCell = row.getCell(4); // Column 4 is the Status column
+  if (status === 'Passed') {
+    statusCell.font = { color: { argb: 'FF00FF00' } }; // Green for passed
+  } else if (status === 'Failed') {
+    statusCell.font = { color: { argb: 'FFFF0000' } }; // Red for failed
+  }
+
+  row.commit(); // Commit the row to ensure it is properly written
+}
+
