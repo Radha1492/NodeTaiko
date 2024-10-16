@@ -275,3 +275,204 @@ Handling the Always-Visible Next Button:
 
 The loop won’t run infinitely since the stopping condition is based on the number of processed rows, not the visibility of the "Next" button.
 This version ensures the test stops after processing all pages, even if the "Next" button remains visible throughout.
+
+
+@@@@@
+Here’s how you can iterate over the columns and rows dynamically by modifying the values of aria-colindex and row-id attributes in the XPath selectors using a for loop inside Cypress.
+
+Below is your updated Cypress code to iterate through the entire table with pagination.
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
+
+describe('Excel Download and Validation Test with Dynamic Table Iteration', () => {
+  const downloadFolder = 'cypress/downloads';
+  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
+  const maxRecordsPerPage = 14;
+
+  it('should download the Excel file and validate its data across all pages', () => {
+    cy.visit('/your-application-url'); // Step 1: Visit the app
+
+    cy.get('button#export-excel').click(); // Step 2: Download the Excel file
+
+    const filename = `${downloadFolder}/exported-data.xlsx`;
+
+    cy.wait(2000); // Adjust based on download speed
+
+    // Step 3: Read and parse the Excel file
+    cy.readFile(filename, 'binary').then((fileContent) => {
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const excelColumns = excelData[0];
+      const excelRows = excelData.slice(1);
+
+      let processedRows = 0;
+      let currentPage = 1;
+
+      function validateCurrentPage() {
+        cy.log(`Validating page: ${currentPage}`);
+
+        // Step 4: Loop through rows and columns dynamically
+        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
+          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
+
+          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
+            const colXpath = `//div[@role='columnheader' and @aria-colindex='${colIndex + 1}']`;
+            
+            // Validate each cell value
+            cy.xpath(rowXpath).within(() => {
+              cy.xpath(colXpath).invoke('text').then((cellText) => {
+                const expectedValue = excelRows[processedRows][colIndex];
+                expect(cellText.trim()).to.equal(String(expectedValue).trim());
+              });
+            });
+          }
+          processedRows++;
+        }
+      }
+
+      function processNextPage() {
+        if (processedRows >= excelRows.length) {
+          cy.log('All records processed');
+          return;
+        }
+
+        cy.xpath(nextButtonXpath).click(); // Go to the next page
+        cy.wait(1000); // Wait for the page to load
+
+        currentPage++;
+        validateCurrentPage(); // Validate the current page
+        processNextPage(); // Move to the next page
+      }
+
+      // Step 5: Start with the first page
+      validateCurrentPage();
+      processNextPage();
+    });
+  });
+});
+
+Explanation
+Dynamic XPath Construction:
+
+The for loops iterate over the rows and columns by modifying the aria-colindex and row-id values dynamically using template literals.
+Recursive Page Navigation:
+
+If there are more pages, the script clicks the "Next" button and continues validation until all records are processed.
+Row and Column Validation:
+
+For every cell in a row, the value is extracted using cy.xpath() and validated against the corresponding Excel data.
+Stopping Condition:
+
+The test will stop once all rows from the Excel file have been processed.
+Use of cy.xpath():
+
+This allows querying elements using XPath instead of CSS selectors.
+This solution ensures that the table is correctly traversed and validated, even with pagination.
+
+To validate column names and data from the Excel file with the UI, you can use the following approach in Cypress. The code will first validate the column headers on the UI and then iterate over the rows and columns to compare the data with the Excel file.
+
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
+
+describe('Excel Download and Validation Test', () => {
+  const downloadFolder = 'cypress/downloads';
+  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
+  const maxRecordsPerPage = 14;
+
+  it('should download the Excel file and validate its data with the UI', () => {
+    cy.visit('/your-application-url'); // Step 1: Visit the app
+
+    // Step 2: Download the Excel file
+    cy.get('button#export-excel').click();
+
+    const filename = `${downloadFolder}/exported-data.xlsx`;
+
+    cy.wait(2000); // Adjust this based on download speed
+
+    // Step 3: Read and parse the Excel file
+    cy.readFile(filename, 'binary').then((fileContent) => {
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const excelColumns = excelData[0]; // First row: Column names
+      const excelRows = excelData.slice(1); // Remaining rows: Data
+
+      let processedRows = 0;
+      let currentPage = 1;
+
+      // Step 4: Validate Column Headers
+      cy.log('Validating column headers...');
+      cy.xpath(`//div[@role='columnheader']`).each((header, index) => {
+        expect(header.text().trim()).to.equal(excelColumns[index]);
+      });
+
+      // Step 5: Validate Data Row by Row
+      function validateCurrentPage() {
+        cy.log(`Validating page: ${currentPage}`);
+
+        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
+          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
+
+          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
+            const colXpath = `${rowXpath}/div[@aria-colindex='${colIndex + 1}']`;
+
+            // Validate each cell's value
+            cy.xpath(colXpath).invoke('text').then((cellText) => {
+              const expectedValue = excelRows[processedRows][excelColumns[colIndex]];
+              expect(cellText.trim()).to.equal(String(expectedValue).trim());
+            });
+          }
+          processedRows++;
+        }
+      }
+
+      // Step 6: Handle Pagination and Validate All Pages
+      function processNextPage() {
+        if (processedRows >= excelRows.length) {
+          cy.log('All records processed.');
+          return;
+        }
+
+        cy.xpath(nextButtonXpath).click(); // Go to the next page
+        cy.wait(1000); // Wait for the next page to load
+
+        currentPage++;
+        validateCurrentPage(); // Validate the current page
+        processNextPage(); // Continue to the next page
+      }
+
+      // Start with the first page
+      validateCurrentPage();
+      processNextPage();
+    });
+  });
+});
+
+
+Explanation
+Column Header Validation:
+
+The code uses XPath to locate column headers dynamically and compares them with the headers from the Excel file.
+Data Validation:
+
+For each row and column, the value from the UI is fetched using XPath, and it is compared with the corresponding value from the Excel file.
+Handling Pagination:
+
+If there are multiple pages, the code recursively clicks the next button until all records are processed.
+Stopping Condition:
+
+The validation stops when all rows from the Excel file are processed.
+XPath Adjustment
+Column Header XPath:
+//div[@role='columnheader']
+
+Row XPath:
+//div[@role='row' and @row-id='${rowIndex}']
+
+Cell XPath:
+${rowXpath}/div[@aria-colindex='${colIndex + 1}']
+
+This code ensures that both column headers and data values are validated correctly across all pages of the table.
