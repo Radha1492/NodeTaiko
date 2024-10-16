@@ -1,113 +1,277 @@
-// cypress/support/commands.js
-const twilio = require('twilio');
-
-Cypress.Commands.add('getOTP', (accountSid, authToken, twilioNumber, toNumber) => {
-  const client = twilio(accountSid, authToken);
-
-  return client.messages
-    .list({ to: toNumber, from: twilioNumber, limit: 5 })
-    .then(messages => {
-      if (messages.length === 0) {
-        throw new Error('No messages found');
-      }
-      const latestMessage = messages[0];
-      const otp = latestMessage.body.match(/\d{4,6}/); // Assuming OTP is a 4-6 digit number
-      if (!otp) {
-        throw new Error('OTP not found in the message');
-      }
-      return otp[0];
-    });
+ });
 });
+I have xpath as below:
+Column :  //div[@role='columnheader' and @aria-colindex='3']
+Rows :  //div[@role='row' and @row-id='0']
+Here by change value of aria-colindex and row-id I want to iterate the entire table.
+Can you please adjust above code accordingly 
+ChatGPT said:
+ChatGPT
+Below is an updated version of your code to incorporate XPath selectors using cy.xpath() and dynamically iterate over table columns and rows. You can install and use the Cypress XPath plugin to work with XPath selectors.
 
+Step 1: Install Cypress XPath Plugin
+Run the following command in your Cypress project:
+Step 2: Update cypress/support/e2e.js (for Cypress v12+)
 
+Step 3: Adjusted Code for XPath Table Iteration
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
 
-4. Use the OTP in your Cypress test
-Use the custom command in your Cypress test to retrieve and use the OTP.
+describe('Excel Download and Validation Test', () => {
 
-// cypress/integration/otp_login_spec.js
-describe('OTP Login Test', () => {
-  const accountSid = 'your_twilio_account_sid';
-  const authToken = 'your_twilio_auth_token';
-  const twilioNumber = 'your_twilio_number';
-  const toNumber = 'number_receiving_otp';
+  const downloadFolder = 'cypress/downloads'; // The folder where downloaded files are stored
 
-  it('logs in with OTP', () => {
-    cy.visit('your_application_url');
+  it('should download the Excel file and validate its data with the UI', () => {
 
-    // Enter the mobile number and trigger the OTP send action
-    cy.get('#mobile_number_input').type(toNumber);
-    cy.get('#send_otp_button').click();
+    // Step 1: Visit the application
+    cy.visit('/your-application-url'); // Replace with your app URL
 
-    // Wait for OTP to be received
-    cy.wait(10000); // Adjust the wait time as needed
+    // Step 2: Click the button to download the Excel file
+    cy.get('button#export-excel').click(); // Replace with actual selector
 
-    // Get OTP from Twilio
-    cy.getOTP(accountSid, authToken, twilioNumber, toNumber).then(otp => {
-      // Enter OTP and submit the login form
-      cy.get('#otp_input').type(otp);
-      cy.get('#login_button').click();
+    // Step 3: Read the downloaded Excel file
+    const filename = `${downloadFolder}/exported-data.xlsx`; // Adjust filename if needed
 
-      // Add assertions to verify successful login
-      cy.url().should('include', '/dashboard');
+    // Wait for download to complete
+    cy.wait(2000); 
+
+    cy.readFile(filename, 'binary').then((fileContent) => {
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const excelColumns = excelData[0]; // First row: Column names
+      const excelRows = excelData.slice(1); // Remaining rows: Data
+
+      // Log extracted columns
+      cy.log('Excel Columns:', excelColumns);
+
+      // Step 4: Validate the data with the UI
+      // Iterate over the table columns and rows using XPath
+      excelColumns.forEach((columnName, colIndex) => {
+        const xpathColumn = `//div[@role='columnheader' and @aria-colindex='${colIndex + 1}']`;
+
+        // Validate the column name with the UI
+        cy.xpath(xpathColumn).should('have.text', columnName.trim());
+      });
+
+      excelRows.forEach((excelRow, rowIndex) => {
+        const xpathRow = `//div[@role='row' and @row-id='${rowIndex}']`;
+
+        // Iterate over each cell in the row
+        excelRow.forEach((cellValue, colIndex) => {
+          const xpathCell = `${xpathRow}//div[@role='gridcell' and @aria-colindex='${colIndex + 1}']`;
+
+          // Validate cell data with UI
+          cy.xpath(xpathCell).should('have.text', String(cellValue).trim());
+        });
+      });
     });
   });
 });
 
 
+Explanation
+Using XPath Selectors:
 
-@@@@
-const fs = require('fs');
-const path = require('path');
-const xlsx = require('xlsx');
+Columns: We iterate over each column using aria-colindex to match the column headers.
+Rows: We use row-id to dynamically iterate over table rows.
+Validating Excel Data with UI Data:
 
-module.exports = {
-  e2e: {
-    setupNodeEvents(on, config) {
-      on('task', {
-        logTestStepToExcel({ step, description, status }) {
-          const logFilePath = path.join(__dirname, 'test-steps-log.xlsx');
+For each Excel column, the script finds the corresponding column on the UI and validates the text.
+For each row and cell, it validates the data using aria-colindex and row-id.
+Handling Excel Data:
+The Excel sheet is converted to a JSON-like structure using xlsx.utils.sheet_to_json(). This allows easy access to column names and row data.
 
-          // Create a new workbook or load the existing one
-          let workbook;
-          if (fs.existsSync(logFilePath)) {
-            // Load existing workbook
-            workbook = xlsx.readFile(logFilePath);
-          } else {
-            // Create a new workbook
-            workbook = xlsx.utils.book_new();
+Using Cypress XPath Plugin:
+The plugin enables the use of cy.xpath() for XPath-based element selection.
+
+To handle pagination in your Cypress script, we need to:
+
+Iterate over multiple pages using the "Next" button.
+Extract and validate data on each page for the visible records.
+Stop iteration once all pages are processed.
+Here's the adjusted code to handle pagination:
+
+Adjusted Cypress Code for Pagination
+
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
+
+describe('Excel Download and Validation Test with Pagination', () => {
+
+  const downloadFolder = 'cypress/downloads'; // Folder for downloaded files
+  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']"; // XPath for the "Next" button
+  const maxRecordsPerPage = 14; // Number of records per page
+
+  it('should download the Excel file and validate its data with the UI across all pages', () => {
+    cy.visit('/your-application-url'); // Step 1: Visit the app
+
+    cy.get('button#export-excel').click(); // Step 2: Download the Excel file
+
+    const filename = `${downloadFolder}/exported-data.xlsx`;
+
+    cy.wait(2000); // Adjust based on download speed
+
+    // Step 3: Read and parse the Excel file
+    cy.readFile(filename, 'binary').then((fileContent) => {
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const excelColumns = excelData[0]; // Extract columns
+      const excelRows = excelData.slice(1); // Extract rows
+
+      cy.log('Excel Columns:', excelColumns);
+
+      // Step 4: Validate data across all pages
+      let processedRows = 0;
+
+      function validateCurrentPage() {
+        // Iterate over visible records on the current page
+        cy.get("div[role='row']").each((row, rowIndex) => {
+          if (rowIndex < maxRecordsPerPage && processedRows < excelRows.length) {
+            const currentExcelRow = excelRows[processedRows];
+
+            cy.wrap(row).find("div[role='gridcell']").each((cell, colIndex) => {
+              const expectedValue = currentExcelRow[colIndex];
+              cy.wrap(cell).should('have.text', String(expectedValue).trim());
+            });
+
+            processedRows++;
           }
+        });
+      }
 
-          // Get or create a worksheet
-          const sheetName = 'Test Steps Log';
-          let worksheet;
-          if (workbook.SheetNames.includes(sheetName)) {
-            worksheet = workbook.Sheets[sheetName];
+      function processNextPage() {
+        cy.xpath(nextButtonXpath).then(($nextButton) => {
+          if ($nextButton.is(':visible')) {
+            cy.wrap($nextButton).click(); // Click next button
+            cy.wait(1000); // Wait for the next page to load
+            validateCurrentPage(); // Validate the next page
+            processNextPage(); // Continue with pagination
           } else {
-            worksheet = xlsx.utils.aoa_to_sheet([['Timestamp', 'Step', 'Description', 'Status']]);
-            xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+            cy.log('All pages processed');
           }
+        });
+      }
 
-          // Get the current date and time for logging
-          const timestamp = new Date().toLocaleString();
+      // Step 5: Start validation with the first page
+      validateCurrentPage();
+      processNextPage();
+    });
+  });
+});
 
-          // Convert worksheet data to JSON to append new rows
-          const sheetData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-          sheetData.push([timestamp, step, description, status]);
+Explanation
+Pagination Handling:
 
-          // Convert the updated JSON back to a worksheet and update the workbook
-          const newWorksheet = xlsx.utils.aoa_to_sheet(sheetData);
-          workbook.Sheets[sheetName] = newWorksheet;
+validateCurrentPage(): This function validates all records on the current page.
+processNextPage(): This function clicks the "Next" button and recursively processes the next page until all pages are covered.
+Stopping Criteria:
 
-          // Write back to the Excel file
-          xlsx.writeFile(workbook, logFilePath);
+The script stops when either:
+All Excel rows are processed.
+The "Next" button is no longer visible (i.e., the last page).
+Waiting for Page Load:
 
-          return null;
-        },
-      });
-    },
-  },
-};
+We use cy.wait() after clicking the "Next" button to ensure the new page has loaded before proceeding.
+Iterating through Visible Records:
+
+Each page shows 14 records, and the script ensures data is validated until the Excel data runs out.
+This approach ensures that your test will correctly validate all 238 records across 17 pages. Let me know if further adjustments are needed!
+
+Next button is always visible. Even though all pages are covered
+ChatGPT said:
+ChatGPT
+If the "Next" button is always visible, we need an alternative way to determine when we have reached the last page. A common approach is to track the current page number or disable further clicks when no more new rows are loaded. Below is an enhanced version of the code that ensures we only process valid pages.
+
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
+
+describe('Excel Download and Validation Test with Pagination', () => {
+
+  const downloadFolder = 'cypress/downloads'; // Folder for downloaded files
+  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']"; // XPath for the "Next" button
+  const maxRecordsPerPage = 14; // Number of records per page
+
+  it('should download the Excel file and validate its data with the UI across all pages', () => {
+    cy.visit('/your-application-url'); // Step 1: Visit the app
+
+    cy.get('button#export-excel').click(); // Step 2: Download the Excel file
+
+    const filename = `${downloadFolder}/exported-data.xlsx`;
+
+    cy.wait(2000); // Adjust based on download speed
+
+    // Step 3: Read and parse the Excel file
+    cy.readFile(filename, 'binary').then((fileContent) => {
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const excelColumns = excelData[0]; // Extract columns
+      const excelRows = excelData.slice(1); // Extract rows
+
+      cy.log('Excel Columns:', excelColumns);
+
+      let processedRows = 0; // Track total rows processed
+      let currentPage = 1; // Track current page
+
+      function validateCurrentPage() {
+        cy.log(`Validating page: ${currentPage}`);
+
+        // Iterate over visible records on the current page
+        cy.get("div[role='row']").each((row, rowIndex) => {
+          if (processedRows < excelRows.length) {
+            const currentExcelRow = excelRows[processedRows];
+
+            cy.wrap(row).find("div[role='gridcell']").each((cell, colIndex) => {
+              const expectedValue = currentExcelRow[colIndex];
+              cy.wrap(cell).should('have.text', String(expectedValue).trim());
+            });
+
+            processedRows++;
+          }
+        });
+      }
+
+      function processNextPage() {
+        if (processedRows >= excelRows.length) {
+          cy.log('All records processed');
+          return; // Stop when all records are validated
+        }
+
+        cy.xpath(nextButtonXpath).click(); // Click the "Next" button
+        cy.wait(1000); // Wait for the page to load
+
+        currentPage++; // Increment the page counter
+        validateCurrentPage(); // Validate the current page
+        processNextPage(); // Continue to the next page
+      }
+
+      // Step 4: Start with the first page
+      validateCurrentPage();
+      processNextPage();
+    });
+  });
+});
 
 
+Key Improvements
+Page Tracking:
 
+We use the currentPage variable to track which page we are on. This helps with debugging and ensures each page is processed in sequence.
+Stop Condition:
 
+The loop exits when processedRows matches the total number of rows from the Excel file, ensuring no unnecessary iterations.
+Recursive Page Navigation:
+
+The function processNextPage() clicks the "Next" button and continues until all records are validated.
+Handling the Always-Visible Next Button:
+
+The loop won’t run infinitely since the stopping condition is based on the number of processed rows, not the visibility of the "Next" button.
+This version ensures the test stops after processing all pages, even if the "Next" button remains visible throughout.
