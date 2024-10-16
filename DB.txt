@@ -645,3 +645,71 @@ describe('Test Logging with Excel File', () => {
   });
 });
 
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@tdyy@@@@@@@@@@@@@@@@
+The error you are encountering (Module not found: Can't resolve 'papaparse') suggests that Cypress is unable to locate the papaparse library. This is likely due to missing or improper installation. Below are the steps to properly install and configure papaparse and an alternative approach to parse CSV files in Cypress.
+
+Step 1: Install papaparse
+Make sure you install papaparse correctly via npm.
+
+npm install papaparse --save-dev
+
+const papaparse = require('papaparse');
+Cypress.Commands.add('parseCSV', (csvContent) => {
+  return papaparse.parse(csvContent, {
+    header: true,
+    skipEmptyLines: true,
+  });
+});
+
+
+/// <reference types="cypress" />
+
+describe('CSV Download and Validation Test', () => {
+  const downloadFolder = 'cypress/downloads'; // Folder for downloads
+  const filename = `${downloadFolder}/exported-data.csv`; // CSV file name
+
+  it('should download the CSV and validate with UI data', () => {
+    // Step 1: Visit the application
+    cy.visit('/your-application-url');
+
+    // Step 2: Trigger the CSV download
+    cy.get('button#export-csv').click();
+
+    // Step 3: Wait and read the downloaded file
+    cy.wait(2000); // Adjust if necessary
+    cy.readFile(filename, 'utf-8').then((csvContent) => {
+      // Parse CSV using custom Cypress command
+      const parsedCSV = cy.parseCSV(csvContent);
+      
+      // Step 4: Extract CSV data
+      parsedCSV.then((csvData) => {
+        const csvColumns = csvData.meta.fields;
+        const csvRows = csvData.data;
+
+        // Log the extracted column names
+        cy.log('CSV Columns:', csvColumns);
+
+        // Step 5: Validate with UI data
+        cy.get('table#data-table').within(() => {
+          // Validate column headers
+          cy.get('thead th').each((header, index) => {
+            expect(header.text().trim()).to.equal(csvColumns[index]);
+          });
+
+          // Validate each row's data
+          cy.get('tbody tr').each((row, rowIndex) => {
+            cy.wrap(row).find('td').each((cell, colIndex) => {
+              const expectedValue = csvRows[rowIndex][csvColumns[colIndex]];
+              expect(cell.text().trim()).to.equal(expectedValue);
+            });
+          });
+        });
+      });
+    });
+  });
+});
+
+
+
+
