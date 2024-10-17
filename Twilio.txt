@@ -815,6 +815,42 @@ const excelFilePath = 'cypress/downloads/exported-data.xlsx';
 // Call the function to read and print Excel data
 readAndPrintExcel(excelFilePath);
 
+### it block##
+
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
+
+describe('Excel Data Validation Test', () => {
+  const downloadFolder = 'cypress/downloads'; // Folder where the Excel file is downloaded
+  const excelFileName = 'exported-data.xlsx'; // Excel file name
+  const filePath = `${downloadFolder}/${excelFileName}`; // Full path to the Excel file
+
+  it('should read and print Excel data from the file', () => {
+    // Step 1: Read the downloaded Excel file using Cypress `readFile`
+    cy.readFile(filePath, 'binary').then((fileContent) => {
+      // Step 2: Parse the Excel file
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]; // Get the first sheet
+
+      // Step 3: Convert the worksheet to JSON
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      // Step 4: Iterate over the rows and columns and log the values
+      cy.log('Reading Excel Data...');
+      for (let row = 0; row < excelData.length; row++) {
+        const rowData = excelData[row];
+
+        cy.log(`Row ${row + 1}:`);
+        for (let col = 0; col < rowData.length; col++) {
+          cy.log(`  Column ${col + 1}: ${rowData[col]}`);
+        }
+      }
+    });
+  });
+});
+
+
+
 
 
 
