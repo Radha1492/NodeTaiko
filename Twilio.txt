@@ -781,5 +781,40 @@ describe('Excel Download and Validation Test', () => {
   });
 });
 
+###333
+const XLSX = require('xlsx'); // Import the xlsx library
+
+// Function to read and print Excel data
+function readAndPrintExcel(filePath) {
+  // Step 1: Read the Excel file
+  const workbook = XLSX.readFile(filePath); // Load the workbook
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]]; // Get the first sheet
+
+  // Step 2: Convert the worksheet to JSON for easier access
+  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+  console.log('Reading Excel Data...');
+
+  // Step 3: Iterate over rows and columns using nested for loop
+  for (let row = 0; row < data.length; row++) {
+    const rowData = data[row];
+
+    // Print the row number
+    console.log(`Row ${row + 1}:`);
+
+    for (let col = 0; col < rowData.length; col++) {
+      // Print each column value
+      console.log(`  Column ${col + 1}: ${rowData[col]}`);
+    }
+  }
+}
+
+// Replace with the path to your Excel file
+const excelFilePath = 'cypress/downloads/exported-data.xlsx';
+
+// Call the function to read and print Excel data
+readAndPrintExcel(excelFilePath);
+
+
 
 
