@@ -476,3 +476,105 @@ Cell XPath:
 ${rowXpath}/div[@aria-colindex='${colIndex + 1}']
 
 This code ensures that both column headers and data values are validated correctly across all pages of the table.
+
+#####################
+/// <reference types="cypress" />
+const XLSX = require('xlsx'); // Import the xlsx library
+
+describe('Excel Download and Validation Test', () => {
+  const downloadFolder = 'cypress/downloads';
+  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
+  const maxRecordsPerPage = 14;
+
+  it('should download the Excel file and validate its data with the UI', () => {
+    cy.visit('/your-application-url'); // Step 1: Visit the app
+
+    // Step 2: Download the Excel file
+    cy.get('button#export-excel').click();
+
+    const filename = `${downloadFolder}/exported-data.xlsx`;
+
+    cy.wait(2000); // Adjust this based on download speed
+
+    // Step 3: Read and parse the Excel file
+    cy.readFile(filename, 'binary').then((fileContent) => {
+      const workbook = XLSX.read(fileContent, { type: 'binary' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      const excelColumns = excelData[0]; // First row: Column names
+      const excelRows = excelData.slice(1); // Remaining rows: Data
+
+      if (excelRows.length === 0) {
+        throw new Error('Excel file has no data to validate!');
+      }
+
+      let processedRows = 0;
+      let currentPage = 1;
+
+      // Step 4: Validate Column Headers
+      cy.log('Validating column headers...');
+      cy.xpath(`//div[@role='columnheader']`).each((header, index) => {
+        const uiColumn = header.text().trim();
+        const excelColumn = excelColumns[index];
+
+        cy.log(`Comparing Column ${index + 1}: UI - "${uiColumn}" vs Excel - "${excelColumn}"`);
+        expect(uiColumn).to.equal(excelColumn);
+      });
+
+      // Step 5: Validate Data Row by Row
+      function validateCurrentPage() {
+        cy.log(`Validating page: ${currentPage}`);
+
+        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
+          const excelRow = excelRows[processedRows];
+          if (!excelRow) {
+            cy.log('All rows from Excel file processed.');
+            return;
+          }
+
+          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
+
+          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
+            const colXpath = `${rowXpath}/div[@aria-colindex='${colIndex + 1}']`;
+            const expectedValue = excelRow[excelColumns[colIndex]];
+
+            cy.xpath(colXpath).invoke('text').then((cellText) => {
+              cy.log(
+                `Comparing Cell: UI - "${cellText.trim()}" vs Excel - "${expectedValue}"`
+              );
+              expect(cellText.trim()).to.equal(String(expectedValue).trim());
+            });
+          }
+          processedRows++;
+        }
+      }
+
+      // Step 6: Handle Pagination and Validate All Pages
+      function processNextPage() {
+        if (processedRows >= excelRows.length) {
+          cy.log('All records from the Excel file validated.');
+          return;
+        }
+
+        cy.xpath(nextButtonXpath).then((button) => {
+          if (button) {
+            cy.wrap(button).click(); // Go to the next page
+            cy.wait(1000); // Wait for the next page to load
+
+            currentPage++;
+            validateCurrentPage(); // Validate the current page
+            processNextPage(); // Continue to the next page
+          } else {
+            cy.log('No more pages to process.');
+          }
+        });
+      }
+
+      // Start with the first page
+      validateCurrentPage();
+      processNextPage();
+    });
+  });
+});
+
