@@ -1,856 +1,105 @@
- });
-});
-I have xpath as below:
-Column :  //div[@role='columnheader' and @aria-colindex='3']
-Rows :  //div[@role='row' and @row-id='0']
-Here by change value of aria-colindex and row-id I want to iterate the entire table.
-Can you please adjust above code accordingly 
-ChatGPT said:
-ChatGPT
-Below is an updated version of your code to incorporate XPath selectors using cy.xpath() and dynamically iterate over table columns and rows. You can install and use the Cypress XPath plugin to work with XPath selectors.
+Modify cypress.config.js: Add the following code in your cypress.config.js file to create a task for moving the file:
 
-Step 1: Install Cypress XPath Plugin
-Run the following command in your Cypress project:
-Step 2: Update cypress/support/e2e.js (for Cypress v12+)
+const fs = require('fs');
+const path = require('path');
 
-Step 3: Adjusted Code for XPath Table Iteration
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        moveCsvFile() {
+          const srcPath = path.join(__dirname, 'cypress', 'fixtures', 'test-data.csv');
+          const archiveDir = path.join(__dirname, 'cypress', 'archive');
+          
+          // Ensure archive directory exists
+          if (!fs.existsSync(archiveDir)) {
+            fs.mkdirSync(archiveDir);
+          }
 
-describe('Excel Download and Validation Test', () => {
+          // Generate a unique name for the archived file
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const destPath = path.join(archiveDir, `test-data-${timestamp}.csv`);
 
-  const downloadFolder = 'cypress/downloads'; // The folder where downloaded files are stored
-
-  it('should download the Excel file and validate its data with the UI', () => {
-
-    // Step 1: Visit the application
-    cy.visit('/your-application-url'); // Replace with your app URL
-
-    // Step 2: Click the button to download the Excel file
-    cy.get('button#export-excel').click(); // Replace with actual selector
-
-    // Step 3: Read the downloaded Excel file
-    const filename = `${downloadFolder}/exported-data.xlsx`; // Adjust filename if needed
-
-    // Wait for download to complete
-    cy.wait(2000); 
-
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const excelColumns = excelData[0]; // First row: Column names
-      const excelRows = excelData.slice(1); // Remaining rows: Data
-
-      // Log extracted columns
-      cy.log('Excel Columns:', excelColumns);
-
-      // Step 4: Validate the data with the UI
-      // Iterate over the table columns and rows using XPath
-      excelColumns.forEach((columnName, colIndex) => {
-        const xpathColumn = `//div[@role='columnheader' and @aria-colindex='${colIndex + 1}']`;
-
-        // Validate the column name with the UI
-        cy.xpath(xpathColumn).should('have.text', columnName.trim());
+          // Move the file
+          return new Promise((resolve, reject) => {
+            fs.rename(srcPath, destPath, (err) => {
+              if (err) {
+                console.error('Error moving file:', err);
+                return reject(err);
+              }
+              console.log('File moved to:', destPath);
+              resolve(null);
+            });
+          });
+        },
       });
+    },
+  },
+};
 
-      excelRows.forEach((excelRow, rowIndex) => {
-        const xpathRow = `//div[@role='row' and @row-id='${rowIndex}']`;
 
-        // Iterate over each cell in the row
-        excelRow.forEach((cellValue, colIndex) => {
-          const xpathCell = `${xpathRow}//div[@role='gridcell' and @aria-colindex='${colIndex + 1}']`;
+Use the Task in Your Test Case:
 
-          // Validate cell data with UI
-          cy.xpath(xpathCell).should('have.text', String(cellValue).trim());
-        });
-      });
-    });
+Call the task in your test case before the CSV file is generated:
+describe('CSV Test Case', () => {
+  before(() => {
+    cy.task('moveCsvFile');
+  });
+
+  it('should generate a new CSV file', () => {
+    // Your test logic that generates a new CSV file
   });
 });
 
+Option 2: Write a Standalone Helper Function
+Alternatively, you can write the file-moving logic as a Node.js helper function and import it where needed.
 
-Explanation
-Using XPath Selectors:
+Create a fileUtils.js File:
 
-Columns: We iterate over each column using aria-colindex to match the column headers.
-Rows: We use row-id to dynamically iterate over table rows.
-Validating Excel Data with UI Data:
+Create a helper file under a utils folder or directly in your Cypress project:
 
-For each Excel column, the script finds the corresponding column on the UI and validates the text.
-For each row and cell, it validates the data using aria-colindex and row-id.
-Handling Excel Data:
-The Excel sheet is converted to a JSON-like structure using xlsx.utils.sheet_to_json(). This allows easy access to column names and row data.
+const fs = require('fs');
+const path = require('path');
 
-Using Cypress XPath Plugin:
-The plugin enables the use of cy.xpath() for XPath-based element selection.
+function moveCsvFile() {
+  const srcPath = path.join(__dirname, '../fixtures/test-data.csv');
+  const archiveDir = path.join(__dirname, '../archive');
 
-To handle pagination in your Cypress script, we need to:
-
-Iterate over multiple pages using the "Next" button.
-Extract and validate data on each page for the visible records.
-Stop iteration once all pages are processed.
-Here's the adjusted code to handle pagination:
-
-Adjusted Cypress Code for Pagination
-
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test with Pagination', () => {
-
-  const downloadFolder = 'cypress/downloads'; // Folder for downloaded files
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']"; // XPath for the "Next" button
-  const maxRecordsPerPage = 14; // Number of records per page
-
-  it('should download the Excel file and validate its data with the UI across all pages', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    cy.get('button#export-excel').click(); // Step 2: Download the Excel file
-
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-
-    cy.wait(2000); // Adjust based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const excelColumns = excelData[0]; // Extract columns
-      const excelRows = excelData.slice(1); // Extract rows
-
-      cy.log('Excel Columns:', excelColumns);
-
-      // Step 4: Validate data across all pages
-      let processedRows = 0;
-
-      function validateCurrentPage() {
-        // Iterate over visible records on the current page
-        cy.get("div[role='row']").each((row, rowIndex) => {
-          if (rowIndex < maxRecordsPerPage && processedRows < excelRows.length) {
-            const currentExcelRow = excelRows[processedRows];
-
-            cy.wrap(row).find("div[role='gridcell']").each((cell, colIndex) => {
-              const expectedValue = currentExcelRow[colIndex];
-              cy.wrap(cell).should('have.text', String(expectedValue).trim());
-            });
-
-            processedRows++;
-          }
-        });
-      }
-
-      function processNextPage() {
-        cy.xpath(nextButtonXpath).then(($nextButton) => {
-          if ($nextButton.is(':visible')) {
-            cy.wrap($nextButton).click(); // Click next button
-            cy.wait(1000); // Wait for the next page to load
-            validateCurrentPage(); // Validate the next page
-            processNextPage(); // Continue with pagination
-          } else {
-            cy.log('All pages processed');
-          }
-        });
-      }
-
-      // Step 5: Start validation with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-Explanation
-Pagination Handling:
-
-validateCurrentPage(): This function validates all records on the current page.
-processNextPage(): This function clicks the "Next" button and recursively processes the next page until all pages are covered.
-Stopping Criteria:
-
-The script stops when either:
-All Excel rows are processed.
-The "Next" button is no longer visible (i.e., the last page).
-Waiting for Page Load:
-
-We use cy.wait() after clicking the "Next" button to ensure the new page has loaded before proceeding.
-Iterating through Visible Records:
-
-Each page shows 14 records, and the script ensures data is validated until the Excel data runs out.
-This approach ensures that your test will correctly validate all 238 records across 17 pages. Let me know if further adjustments are needed!
-
-Next button is always visible. Even though all pages are covered
-ChatGPT said:
-ChatGPT
-If the "Next" button is always visible, we need an alternative way to determine when we have reached the last page. A common approach is to track the current page number or disable further clicks when no more new rows are loaded. Below is an enhanced version of the code that ensures we only process valid pages.
-
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test with Pagination', () => {
-
-  const downloadFolder = 'cypress/downloads'; // Folder for downloaded files
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']"; // XPath for the "Next" button
-  const maxRecordsPerPage = 14; // Number of records per page
-
-  it('should download the Excel file and validate its data with the UI across all pages', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    cy.get('button#export-excel').click(); // Step 2: Download the Excel file
-
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-
-    cy.wait(2000); // Adjust based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const excelColumns = excelData[0]; // Extract columns
-      const excelRows = excelData.slice(1); // Extract rows
-
-      cy.log('Excel Columns:', excelColumns);
-
-      let processedRows = 0; // Track total rows processed
-      let currentPage = 1; // Track current page
-
-      function validateCurrentPage() {
-        cy.log(`Validating page: ${currentPage}`);
-
-        // Iterate over visible records on the current page
-        cy.get("div[role='row']").each((row, rowIndex) => {
-          if (processedRows < excelRows.length) {
-            const currentExcelRow = excelRows[processedRows];
-
-            cy.wrap(row).find("div[role='gridcell']").each((cell, colIndex) => {
-              const expectedValue = currentExcelRow[colIndex];
-              cy.wrap(cell).should('have.text', String(expectedValue).trim());
-            });
-
-            processedRows++;
-          }
-        });
-      }
-
-      function processNextPage() {
-        if (processedRows >= excelRows.length) {
-          cy.log('All records processed');
-          return; // Stop when all records are validated
-        }
-
-        cy.xpath(nextButtonXpath).click(); // Click the "Next" button
-        cy.wait(1000); // Wait for the page to load
-
-        currentPage++; // Increment the page counter
-        validateCurrentPage(); // Validate the current page
-        processNextPage(); // Continue to the next page
-      }
-
-      // Step 4: Start with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-
-Key Improvements
-Page Tracking:
-
-We use the currentPage variable to track which page we are on. This helps with debugging and ensures each page is processed in sequence.
-Stop Condition:
-
-The loop exits when processedRows matches the total number of rows from the Excel file, ensuring no unnecessary iterations.
-Recursive Page Navigation:
-
-The function processNextPage() clicks the "Next" button and continues until all records are validated.
-Handling the Always-Visible Next Button:
-
-The loop won’t run infinitely since the stopping condition is based on the number of processed rows, not the visibility of the "Next" button.
-This version ensures the test stops after processing all pages, even if the "Next" button remains visible throughout.
-
-
-@@@@@
-Here’s how you can iterate over the columns and rows dynamically by modifying the values of aria-colindex and row-id attributes in the XPath selectors using a for loop inside Cypress.
-
-Below is your updated Cypress code to iterate through the entire table with pagination.
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test with Dynamic Table Iteration', () => {
-  const downloadFolder = 'cypress/downloads';
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
-  const maxRecordsPerPage = 14;
-
-  it('should download the Excel file and validate its data across all pages', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    cy.get('button#export-excel').click(); // Step 2: Download the Excel file
-
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-
-    cy.wait(2000); // Adjust based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const excelColumns = excelData[0];
-      const excelRows = excelData.slice(1);
-
-      let processedRows = 0;
-      let currentPage = 1;
-
-      function validateCurrentPage() {
-        cy.log(`Validating page: ${currentPage}`);
-
-        // Step 4: Loop through rows and columns dynamically
-        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
-          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
-
-          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
-            const colXpath = `//div[@role='columnheader' and @aria-colindex='${colIndex + 1}']`;
-            
-            // Validate each cell value
-            cy.xpath(rowXpath).within(() => {
-              cy.xpath(colXpath).invoke('text').then((cellText) => {
-                const expectedValue = excelRows[processedRows][colIndex];
-                expect(cellText.trim()).to.equal(String(expectedValue).trim());
-              });
-            });
-          }
-          processedRows++;
-        }
-      }
-
-      function processNextPage() {
-        if (processedRows >= excelRows.length) {
-          cy.log('All records processed');
-          return;
-        }
-
-        cy.xpath(nextButtonXpath).click(); // Go to the next page
-        cy.wait(1000); // Wait for the page to load
-
-        currentPage++;
-        validateCurrentPage(); // Validate the current page
-        processNextPage(); // Move to the next page
-      }
-
-      // Step 5: Start with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-Explanation
-Dynamic XPath Construction:
-
-The for loops iterate over the rows and columns by modifying the aria-colindex and row-id values dynamically using template literals.
-Recursive Page Navigation:
-
-If there are more pages, the script clicks the "Next" button and continues validation until all records are processed.
-Row and Column Validation:
-
-For every cell in a row, the value is extracted using cy.xpath() and validated against the corresponding Excel data.
-Stopping Condition:
-
-The test will stop once all rows from the Excel file have been processed.
-Use of cy.xpath():
-
-This allows querying elements using XPath instead of CSS selectors.
-This solution ensures that the table is correctly traversed and validated, even with pagination.
-
-To validate column names and data from the Excel file with the UI, you can use the following approach in Cypress. The code will first validate the column headers on the UI and then iterate over the rows and columns to compare the data with the Excel file.
-
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test', () => {
-  const downloadFolder = 'cypress/downloads';
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
-  const maxRecordsPerPage = 14;
-
-  it('should download the Excel file and validate its data with the UI', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    // Step 2: Download the Excel file
-    cy.get('button#export-excel').click();
-
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-
-    cy.wait(2000); // Adjust this based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const excelColumns = excelData[0]; // First row: Column names
-      const excelRows = excelData.slice(1); // Remaining rows: Data
-
-      let processedRows = 0;
-      let currentPage = 1;
-
-      // Step 4: Validate Column Headers
-      cy.log('Validating column headers...');
-      cy.xpath(`//div[@role='columnheader']`).each((header, index) => {
-        expect(header.text().trim()).to.equal(excelColumns[index]);
-      });
-
-      // Step 5: Validate Data Row by Row
-      function validateCurrentPage() {
-        cy.log(`Validating page: ${currentPage}`);
-
-        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
-          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
-
-          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
-            const colXpath = `${rowXpath}/div[@aria-colindex='${colIndex + 1}']`;
-
-            // Validate each cell's value
-            cy.xpath(colXpath).invoke('text').then((cellText) => {
-              const expectedValue = excelRows[processedRows][excelColumns[colIndex]];
-              expect(cellText.trim()).to.equal(String(expectedValue).trim());
-            });
-          }
-          processedRows++;
-        }
-      }
-
-      // Step 6: Handle Pagination and Validate All Pages
-      function processNextPage() {
-        if (processedRows >= excelRows.length) {
-          cy.log('All records processed.');
-          return;
-        }
-
-        cy.xpath(nextButtonXpath).click(); // Go to the next page
-        cy.wait(1000); // Wait for the next page to load
-
-        currentPage++;
-        validateCurrentPage(); // Validate the current page
-        processNextPage(); // Continue to the next page
-      }
-
-      // Start with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-
-Explanation
-Column Header Validation:
-
-The code uses XPath to locate column headers dynamically and compares them with the headers from the Excel file.
-Data Validation:
-
-For each row and column, the value from the UI is fetched using XPath, and it is compared with the corresponding value from the Excel file.
-Handling Pagination:
-
-If there are multiple pages, the code recursively clicks the next button until all records are processed.
-Stopping Condition:
-
-The validation stops when all rows from the Excel file are processed.
-XPath Adjustment
-Column Header XPath:
-//div[@role='columnheader']
-
-Row XPath:
-//div[@role='row' and @row-id='${rowIndex}']
-
-Cell XPath:
-${rowXpath}/div[@aria-colindex='${colIndex + 1}']
-
-This code ensures that both column headers and data values are validated correctly across all pages of the table.
-
-#####################
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test', () => {
-  const downloadFolder = 'cypress/downloads';
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
-  const maxRecordsPerPage = 14;
-
-  it('should download the Excel file and validate its data with the UI', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    // Step 2: Download the Excel file
-    cy.get('button#export-excel').click();
-
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-
-    cy.wait(2000); // Adjust this based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      const excelColumns = excelData[0]; // First row: Column names
-      const excelRows = excelData.slice(1); // Remaining rows: Data
-
-      if (excelRows.length === 0) {
-        throw new Error('Excel file has no data to validate!');
-      }
-
-      let processedRows = 0;
-      let currentPage = 1;
-
-      // Step 4: Validate Column Headers
-      cy.log('Validating column headers...');
-      cy.xpath(`//div[@role='columnheader']`).each((header, index) => {
-        const uiColumn = header.text().trim();
-        const excelColumn = excelColumns[index];
-
-        cy.log(`Comparing Column ${index + 1}: UI - "${uiColumn}" vs Excel - "${excelColumn}"`);
-        expect(uiColumn).to.equal(excelColumn);
-      });
-
-      // Step 5: Validate Data Row by Row
-      function validateCurrentPage() {
-        cy.log(`Validating page: ${currentPage}`);
-
-        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
-          const excelRow = excelRows[processedRows];
-          if (!excelRow) {
-            cy.log('All rows from Excel file processed.');
-            return;
-          }
-
-          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
-
-          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
-            const colXpath = `${rowXpath}/div[@aria-colindex='${colIndex + 1}']`;
-            const expectedValue = excelRow[excelColumns[colIndex]];
-
-            cy.xpath(colXpath).invoke('text').then((cellText) => {
-              cy.log(
-                `Comparing Cell: UI - "${cellText.trim()}" vs Excel - "${expectedValue}"`
-              );
-              expect(cellText.trim()).to.equal(String(expectedValue).trim());
-            });
-          }
-          processedRows++;
-        }
-      }
-
-      // Step 6: Handle Pagination and Validate All Pages
-      function processNextPage() {
-        if (processedRows >= excelRows.length) {
-          cy.log('All records from the Excel file validated.');
-          return;
-        }
-
-        cy.xpath(nextButtonXpath).then((button) => {
-          if (button) {
-            cy.wrap(button).click(); // Go to the next page
-            cy.wait(1000); // Wait for the next page to load
-
-            currentPage++;
-            validateCurrentPage(); // Validate the current page
-            processNextPage(); // Continue to the next page
-          } else {
-            cy.log('No more pages to process.');
-          }
-        });
-      }
-
-      // Start with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-@@@@@  1111 
-
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test', () => {
-  const downloadFolder = 'cypress/downloads';
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
-  const maxRecordsPerPage = 14;
-
-  it('should download the Excel file and validate its data with the UI', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    // Step 2: Download the Excel file
-    cy.get('button#export-excel').click();
-
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-
-    cy.wait(2000); // Adjust this based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-      // Convert the worksheet into JSON using column headers
-      const excelData = XLSX.utils.sheet_to_json(worksheet);
-      cy.log('Parsed Excel Data:', JSON.stringify(excelData, null, 2));
-
-      const excelColumns = Object.keys(excelData[0] || {}); // Extract column headers
-      const excelRows = excelData; // All data rows
-
-      if (excelRows.length === 0) {
-        throw new Error('Excel file has no data to validate!');
-      }
-
-      let processedRows = 0;
-      let currentPage = 1;
-
-      // Step 4: Validate Column Headers
-      cy.log('Validating column headers...');
-      cy.xpath(`//div[@role='columnheader']`).each((header, index) => {
-        const uiColumn = header.text().trim();
-        const excelColumn = excelColumns[index];
-
-        cy.log(`Comparing Column ${index + 1}: UI - "${uiColumn}" vs Excel - "${excelColumn}"`);
-        expect(uiColumn).to.equal(excelColumn);
-      });
-
-      // Step 5: Validate Data Row by Row
-      function validateCurrentPage() {
-        cy.log(`Validating page: ${currentPage}`);
-
-        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
-          const excelRow = excelRows[processedRows];
-          if (!excelRow) {
-            cy.log('All rows from Excel file processed.');
-            return;
-          }
-
-          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
-
-          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
-            const colXpath = `${rowXpath}/div[@aria-colindex='${colIndex + 1}']`;
-            const columnName = excelColumns[colIndex]; // Get column name
-            const expectedValue = excelRow[columnName]; // Get value from Excel
-
-            cy.log(`Reading Excel: Row ${processedRows}, Column "${columnName}" - Value: ${expectedValue}`);
-
-            cy.xpath(colXpath).invoke('text').then((cellText) => {
-              cy.log(`Comparing Cell: UI - "${cellText.trim()}" vs Excel - "${expectedValue}"`);
-              expect(cellText.trim()).to.equal(String(expectedValue).trim());
-            });
-          }
-          processedRows++;
-        }
-      }
-
-      // Step 6: Handle Pagination and Validate All Pages
-      function processNextPage() {
-        if (processedRows >= excelRows.length) {
-          cy.log('All records from the Excel file validated.');
-          return;
-        }
-
-        cy.xpath(nextButtonXpath).then((button) => {
-          if (button) {
-            cy.wrap(button).click(); // Go to the next page
-            cy.wait(1000); // Wait for the next page to load
-
-            currentPage++;
-            validateCurrentPage(); // Validate the current page
-            processNextPage(); // Continue to the next page
-          } else {
-            cy.log('No more pages to process.');
-          }
-        });
-      }
-
-      // Start with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-22222
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Download and Validation Test', () => {
-  const downloadFolder = 'cypress/downloads';
-  const nextButtonXpath = "//span[@class='ag-icon ag-icon-next']";
-  const maxRecordsPerPage = 14;
-
-  it('should download the Excel file and validate its data with the UI', () => {
-    cy.visit('/your-application-url'); // Step 1: Visit the app
-
-    // Step 2: Download the Excel file
-    cy.get('button#export-excel').click();
-    const filename = `${downloadFolder}/exported-data.xlsx`;
-    cy.wait(2000); // Adjust based on download speed
-
-    // Step 3: Read and parse the Excel file
-    cy.readFile(filename, 'binary').then((fileContent) => {
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const excelData = XLSX.utils.sheet_to_json(worksheet);
-      cy.log('Parsed Excel Data:', JSON.stringify(excelData, null, 2));
-
-      // Normalize column headers by removing spaces
-      const excelColumns = Object.keys(excelData[0] || {}).map(col => col.replace(/\s+/g, ''));
-
-      let processedRows = 0;
-      let currentPage = 1;
-
-      // Step 4: Validate Column Headers
-      cy.log('Validating column headers...');
-      cy.xpath(`//div[@role='columnheader']`).each((header, index) => {
-        const uiColumn = header.text().trim().replace(/\s+/g, '');
-        const excelColumn = excelColumns[index];
-
-        cy.log(`Comparing Column ${index + 1}: UI - "${uiColumn}" vs Excel - "${excelColumn}"`);
-        expect(uiColumn).to.equal(excelColumn);
-      });
-
-      // Step 5: Validate Data Row by Row
-      function validateCurrentPage() {
-        cy.log(`Validating page: ${currentPage}`);
-
-        for (let rowIndex = 0; rowIndex < maxRecordsPerPage; rowIndex++) {
-          const excelRow = excelData[processedRows];
-          if (!excelRow) {
-            cy.log('All rows from Excel file processed.');
-            return;
-          }
-
-          const rowXpath = `//div[@role='row' and @row-id='${rowIndex}']`;
-
-          for (let colIndex = 0; colIndex < excelColumns.length; colIndex++) {
-            const colXpath = `${rowXpath}/div[@aria-colindex='${colIndex + 1}']`;
-            const columnName = Object.keys(excelRow)[colIndex].replace(/\s+/g, ''); // Normalize column name
-            const expectedValue = excelRow[columnName];
-
-            cy.log(`Reading Excel: Row ${processedRows}, Column "${columnName}" - Value: ${expectedValue}`);
-
-            cy.xpath(colXpath).invoke('text').then((cellText) => {
-              cy.log(`Comparing Cell: UI - "${cellText.trim()}" vs Excel - "${expectedValue}"`);
-              expect(cellText.trim()).to.equal(String(expectedValue).trim());
-            });
-          }
-          processedRows++;
-        }
-      }
-
-      // Step 6: Handle Pagination and Validate All Pages
-      function processNextPage() {
-        if (processedRows >= excelData.length) {
-          cy.log('All records from the Excel file validated.');
-          return;
-        }
-
-        cy.xpath(nextButtonXpath).then((button) => {
-          if (button) {
-            cy.wrap(button).click(); // Go to the next page
-            cy.wait(1000); // Wait for the next page to load
-
-            currentPage++;
-            validateCurrentPage(); // Validate the current page
-            processNextPage(); // Continue to the next page
-          } else {
-            cy.log('No more pages to process.');
-          }
-        });
-      }
-
-      // Start with the first page
-      validateCurrentPage();
-      processNextPage();
-    });
-  });
-});
-
-###333
-const XLSX = require('xlsx'); // Import the xlsx library
-
-// Function to read and print Excel data
-function readAndPrintExcel(filePath) {
-  // Step 1: Read the Excel file
-  const workbook = XLSX.readFile(filePath); // Load the workbook
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]]; // Get the first sheet
-
-  // Step 2: Convert the worksheet to JSON for easier access
-  const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-  console.log('Reading Excel Data...');
-
-  // Step 3: Iterate over rows and columns using nested for loop
-  for (let row = 0; row < data.length; row++) {
-    const rowData = data[row];
-
-    // Print the row number
-    console.log(`Row ${row + 1}:`);
-
-    for (let col = 0; col < rowData.length; col++) {
-      // Print each column value
-      console.log(`  Column ${col + 1}: ${rowData[col]}`);
-    }
+  // Ensure archive directory exists
+  if (!fs.existsSync(archiveDir)) {
+    fs.mkdirSync(archiveDir);
   }
+
+  // Generate a unique name for the archived file
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const destPath = path.join(archiveDir, `test-data-${timestamp}.csv`);
+
+  // Move the file
+  return new Promise((resolve, reject) => {
+    fs.rename(srcPath, destPath, (err) => {
+      if (err) {
+        console.error('Error moving file:', err);
+        return reject(err);
+      }
+      console.log('File moved to:', destPath);
+      resolve(null);
+    });
+  });
 }
 
-// Replace with the path to your Excel file
-const excelFilePath = 'cypress/downloads/exported-data.xlsx';
+module.exports = { moveCsvFile };
 
-// Call the function to read and print Excel data
-readAndPrintExcel(excelFilePath);
+const { moveCsvFile } = require('../utils/fileUtils');
 
-### it block##
-
-/// <reference types="cypress" />
-const XLSX = require('xlsx'); // Import the xlsx library
-
-describe('Excel Data Validation Test', () => {
-  const downloadFolder = 'cypress/downloads'; // Folder where the Excel file is downloaded
-  const excelFileName = 'exported-data.xlsx'; // Excel file name
-  const filePath = `${downloadFolder}/${excelFileName}`; // Full path to the Excel file
-
-  it('should read and print Excel data from the file', () => {
-    // Step 1: Read the downloaded Excel file using Cypress `readFile`
-    cy.readFile(filePath, 'binary').then((fileContent) => {
-      // Step 2: Parse the Excel file
-      const workbook = XLSX.read(fileContent, { type: 'binary' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]]; // Get the first sheet
-
-      // Step 3: Convert the worksheet to JSON
-      const excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      // Step 4: Iterate over the rows and columns and log the values
-      cy.log('Reading Excel Data...');
-      for (let row = 0; row < excelData.length; row++) {
-        const rowData = excelData[row];
-
-        cy.log(`Row ${row + 1}:`);
-        for (let col = 0; col < rowData.length; col++) {
-          cy.log(`  Column ${col + 1}: ${rowData[col]}`);
-        }
-      }
+describe('CSV Test Case', () => {
+  before(() => {
+    cy.wrap(moveCsvFile()).then(() => {
+      console.log('Old CSV file moved to archive.');
     });
   });
+
+  it('should generate a new CSV file', () => {
+    // Your test logic to generate a new CSV
+  });
 });
-
-
-
-
-
 
