@@ -103,3 +103,62 @@ describe('CSV Test Case', () => {
   });
 });
 
+####
+const fs = require('fs');
+const path = require('path');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        moveFile({ fileName, fileType }) {
+          const srcPath = path.join(__dirname, 'cypress', 'fixtures', `${fileName}.${fileType}`);
+          const archiveDir = path.join(__dirname, 'cypress', 'archive');
+
+          // Ensure the archive directory exists
+          if (!fs.existsSync(archiveDir)) {
+            fs.mkdirSync(archiveDir);
+          }
+
+          // Check if the file exists
+          if (!fs.existsSync(srcPath)) {
+            const message = `File "${fileName}.${fileType}" does not exist.`;
+            console.warn(message);
+            return Promise.resolve(message); // Return message without failing the task
+          }
+
+          // Generate a unique name for the archived file
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const destPath = path.join(archiveDir, `${fileName}-${timestamp}.${fileType}`);
+
+          // Move the file
+          return new Promise((resolve, reject) => {
+            fs.rename(srcPath, destPath, (err) => {
+              if (err) {
+                console.error('Error moving file:', err);
+                return reject(err);
+              }
+              const successMessage = `File moved to: ${destPath}`;
+              console.log(successMessage);
+              resolve(successMessage);
+            });
+          });
+        },
+      });
+    },
+  },
+};
+
+describe('Move File Test', () => {
+  before(() => {
+    cy.task('moveFile', { fileName: 'test-data', fileType: 'csv' }).then((result) => {
+      console.log(result); // Logs either the success or "file not found" message
+    });
+  });
+
+  it('should generate a new CSV file', () => {
+    // Your test logic to generate a new CSV file
+  });
+});
+
+
