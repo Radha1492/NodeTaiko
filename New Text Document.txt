@@ -228,6 +228,706 @@ This guide helps you set up Cypress on your local machine and get started with a
 
 Let me know if this works for you or if you need further refinements! 🚀
 
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@2
+In my project I am using cypress and selenium both for a single test case some test steps I am doing from Cypress and some are executing with selenium. But I want to use Cypress as a primary tool and want to invoke selenium test scripts in between of the cypress execution. For reporting and framework everything want to use cypress.
+How to handle this situation ?
+ChatGPT said:
+ChatGPT
+Combining Cypress and Selenium for a single test case can be complex, but it’s doable with some well-organized techniques. Since you want Cypress as the primary tool (reporting, framework) and Selenium to be invoked from Cypress scripts, here’s a strategy you can use:
+
+Strategy Overview:
+Use Selenium WebDriver with Node.js:
+You can invoke Selenium test scripts from Cypress using Node.js modules.
+
+Trigger Selenium Test Execution from Cypress task API:
+Cypress can run Selenium scripts via cy.task() and get the results.
+
+Centralized Reporting in Cypress:
+
+Store Selenium results as part of the Cypress test logs.
+Use Mocha Awesome or Allure reporters with Cypress to consolidate reporting.
+Solution: Integrate Selenium Inside Cypress Execution
+Step 1: Setup Selenium WebDriver Script in Node.js
+Make sure your Selenium scripts are written in Node.js or can be invoked from it. Here’s an example of a Selenium WebDriver script:
+javascript
+Copy code
+// seleniumScript.js
+const { Builder, By, Key } = require('selenium-webdriver');
+
+async function runSeleniumTest() {
+  let driver = await new Builder().forBrowser('chrome').build();
+  try {
+    await driver.get('https://example.com');
+    let element = await driver.findElement(By.name('q'));
+    await element.sendKeys('Cypress and Selenium', Key.RETURN);
+    let title = await driver.getTitle();
+    return `Title is: ${title}`;  // Return result for Cypress report
+  } catch (error) {
+    console.error('Error in Selenium test:', error);
+    return `Selenium Error: ${error.message}`;
+  } finally {
+    await driver.quit();
+  }
+}
+
+// Export the Selenium function
+module.exports = { runSeleniumTest };
+Step 2: Define Cypress Task to Invoke Selenium
+Modify the cypress.config.js or setupNodeEvents function to add a task that triggers your Selenium script.
+
+javascript
+Copy code
+const { runSeleniumTest } = require('./seleniumScript');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        // Task to run Selenium test and return its result
+        runSelenium() {
+          return runSeleniumTest().then((result) => {
+            console.log(result);
+            return result;  // Pass result back to Cypress
+          }).catch((err) => {
+            console.error('Error invoking Selenium:', err);
+            return `Error: ${err.message}`;
+          });
+        }
+      });
+    }
+  }
+};
+Step 3: Call Selenium Test Inside Cypress Test Script
+You can now invoke the Selenium task during Cypress test execution and capture the result.
+
+javascript
+Copy code
+describe('Cypress with Selenium Integration', () => {
+  it('Should execute Selenium script during Cypress test', () => {
+    cy.visit('https://example.com');
+
+    // Perform some Cypress actions
+    cy.get('input[name="q"]').type('Selenium Integration{enter}');
+
+    // Invoke Selenium task and verify result
+    cy.task('runSelenium').then((result) => {
+      cy.log('Selenium Result:', result);
+      expect(result).to.include('Title is');  // Assertion based on Selenium result
+    });
+
+    // Continue Cypress steps after Selenium execution
+    cy.get('h1').should('contain', 'Example Domain');
+  });
+});
+Step 4: Reporting with Cypress Mocha Awesome Reports
+All Cypress and Selenium results will now be available in your Cypress reports. If you’re using Mocha Awesome or Allure, the results will be consolidated.
+
+Install Mocha Awesome Report:
+
+bash
+Copy code
+npm install --save-dev cypress-mochawesome-reporter
+Add Reporter to Config:
+
+javascript
+Copy code
+const { defineConfig } = require('cypress');
+module.exports = defineConfig({
+  reporter: 'cypress-mochawesome-reporter',
+  e2e: {
+    setupNodeEvents(on, config) {
+      require('cypress-mochawesome-reporter/plugin')(on);
+    }
+  }
+});
+How This Works:
+Cypress Test Execution: The primary flow runs in Cypress.
+Invoke Selenium: You call the Selenium script via cy.task() during the Cypress execution.
+Consolidated Reporting: Selenium results are returned to Cypress and included in the report.
+Benefits:
+Seamless Execution: You can run both Cypress and Selenium without switching tools.
+Centralized Reporting: All results are in the Cypress report.
+Automation Familiarization: Team members only need to run Cypress, even if Selenium is used under the hood.
+This approach allows smooth integration between Cypress and Selenium, ensuring you get the best of both tools while maintaining a simple workflow for your team. Let me know if you encounter any issues or need further help!
+
+
+
+
+
+
+You said:
+I want to use selenium and Appium both
+ChatGPT said:
+ChatGPT
+You can integrate Selenium and Appium into your Cypress test execution using the same strategy as before by leveraging the Cypress task API to invoke Selenium and Appium scripts from within Cypress. This will allow you to use Cypress as the primary tool, with centralized reporting and execution orchestration, while still using Selenium and Appium for specific steps (e.g., mobile testing with Appium).
+
+Below is the complete guide on integrating Selenium and Appium with Cypress.
+
+Solution: Cypress + Selenium + Appium Integration
+1. Setup Selenium and Appium Node.js Scripts
+Both Selenium and Appium scripts should be written in Node.js or callable via Node.js to ensure seamless execution from Cypress.
+
+Selenium Script (seleniumScript.js):
+javascript
+Copy code
+const { Builder, By, Key } = require('selenium-webdriver');
+
+async function runSeleniumTest() {
+  let driver = await new Builder().forBrowser('chrome').build();
+  try {
+    await driver.get('https://example.com');
+    let element = await driver.findElement(By.name('q'));
+    await element.sendKeys('Cypress with Selenium', Key.RETURN);
+    let title = await driver.getTitle();
+    return `Selenium Title: ${title}`;  // Return result for reporting
+  } catch (error) {
+    console.error('Error in Selenium:', error);
+    return `Selenium Error: ${error.message}`;
+  } finally {
+    await driver.quit();
+  }
+}
+
+module.exports = { runSeleniumTest };
+Appium Script (appiumScript.js):
+javascript
+Copy code
+const { remote } = require('webdriverio');
+
+// Appium configuration for Android device
+const opts = {
+  path: '/wd/hub',
+  port: 4723,
+  capabilities: {
+    platformName: 'Android',
+    platformVersion: '11.0',
+    deviceName: 'Android Emulator',
+    app: '/path/to/your/app.apk',
+    automationName: 'UiAutomator2'
+  }
+};
+
+async function runAppiumTest() {
+  const client = await remote(opts);
+  try {
+    await client.launchApp();
+    let element = await client.$('~SomeElement');
+    await element.click();
+    let resultText = await client.$('~ResultElement').getText();
+    return `Appium Result: ${resultText}`;  // Return result for reporting
+  } catch (error) {
+    console.error('Error in Appium:', error);
+    return `Appium Error: ${error.message}`;
+  } finally {
+    await client.deleteSession();
+  }
+}
+
+module.exports = { runAppiumTest };
+2. Configure Cypress to Run Selenium and Appium Scripts
+Modify the cypress.config.js file to define tasks that invoke your Selenium and Appium scripts.
+
+cypress.config.js:
+javascript
+Copy code
+const { runSeleniumTest } = require('./seleniumScript');
+const { runAppiumTest } = require('./appiumScript');
+
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        // Task to run Selenium
+        runSelenium() {
+          return runSeleniumTest().then(result => {
+            console.log(result);
+            return result;
+          }).catch(err => {
+            console.error('Selenium Error:', err);
+            return `Selenium Error: ${err.message}`;
+          });
+        },
+
+        // Task to run Appium
+        runAppium() {
+          return runAppiumTest().then(result => {
+            console.log(result);
+            return result;
+          }).catch(err => {
+            console.error('Appium Error:', err);
+            return `Appium Error: ${err.message}`;
+          });
+        }
+      });
+    }
+  }
+};
+3. Invoke Selenium and Appium Tests from Cypress Test Script
+You can now invoke Selenium and Appium during Cypress execution using cy.task().
+
+Cypress Test Script:
+javascript
+Copy code
+describe('Cypress + Selenium + Appium Integration', () => {
+  it('Should invoke Selenium and Appium from Cypress', () => {
+    // Step 1: Cypress actions
+    cy.visit('https://example.com');
+    cy.get('input[name="q"]').type('Selenium and Appium Integration{enter}');
+
+    // Step 2: Invoke Selenium Test
+    cy.task('runSelenium').then((seleniumResult) => {
+      cy.log('Selenium Result:', seleniumResult);
+      expect(seleniumResult).to.include('Selenium Title');
+    });
+
+    // Step 3: Invoke Appium Test
+    cy.task('runAppium').then((appiumResult) => {
+      cy.log('Appium Result:', appiumResult);
+      expect(appiumResult).to.include('Appium Result');
+    });
+
+    // Step 4: Continue Cypress test execution
+    cy.get('h1').should('contain', 'Example Domain');
+  });
+});
+4. Setup Reporting in Cypress
+Use Mocha Awesome or Allure Reports with Cypress to consolidate the results from Selenium, Appium, and Cypress into a single report.
+
+Install Mocha Awesome Report:
+
+bash
+Copy code
+npm install --save-dev cypress-mochawesome-reporter
+Configure Mocha Awesome in Cypress: Add the reporter configuration in your cypress.config.js:
+
+javascript
+Copy code
+const { defineConfig } = require('cypress');
+module.exports = defineConfig({
+  reporter: 'cypress-mochawesome-reporter',
+  e2e: {
+    setupNodeEvents(on, config) {
+      require('cypress-mochawesome-reporter/plugin')(on);
+    }
+  }
+});
+5. Execution Flow Summary
+Cypress Test Starts:
+Cypress initiates and performs the first set of actions.
+
+Selenium and Appium Invoked:
+Selenium and Appium scripts are triggered via cy.task().
+
+Consolidated Reporting:
+Results from Selenium, Appium, and Cypress are logged and reported in Cypress.
+
+Benefits of This Approach
+Unified Execution and Reporting: All results (Cypress, Selenium, and Appium) are reported centrally.
+Familiarization with Automation: QA team only interacts with Cypress, regardless of whether Selenium or Appium is used.
+Flexible Execution: Leverage Cypress for web testing, Selenium for browser tests, and Appium for mobile tests seamlessly.
+This solution ensures that you use Cypress as your primary tool for orchestration and reporting while also leveraging Selenium and Appium where needed. Let me know if you face any challenges!
+
+
+
+
+
+
+You said:
+Can you suggest  any other way ?
+ChatGPT said:
+ChatGPT
+Yes! An alternative approach involves triggering Selenium and Appium tests via API calls or external command-line scripts while keeping Cypress as the orchestrator. This solution avoids embedding Selenium/Appium logic directly into Cypress, keeping the codebases independent while still using Cypress as the primary tool for reporting and execution. Here’s how you can do that:
+
+Alternative Approach: Cypress + Selenium + Appium using APIs or CLI
+Overview
+Host Selenium/Appium tests independently (on a CI server or Docker container).
+Trigger Selenium/Appium tests using API endpoints or command-line scripts.
+Capture results from Selenium/Appium and log them into Cypress reports.
+Approach 1: Trigger Selenium and Appium via API
+If your Selenium and Appium tests are deployed as services (on Jenkins or another server), you can trigger them through API calls.
+
+Steps to Implement
+Deploy Selenium/Appium on Jenkins or Any Server:
+Ensure that Selenium/Appium tests can be triggered via REST APIs.
+
+Modify Cypress Test to Call the APIs:
+Use cy.request() to trigger Selenium/Appium tests during Cypress execution.
+
+Sample Cypress Test:
+javascript
+Copy code
+describe('Cypress + Selenium + Appium API Integration', () => {
+  it('Should trigger Selenium and Appium tests via API and log results', () => {
+    // Step 1: Cypress actions
+    cy.visit('https://example.com');
+    cy.get('input[name="q"]').type('Automation Integration{enter}');
+
+    // Step 2: Trigger Selenium test via API
+    cy.request('POST', 'http://jenkins-server/selenium-trigger').then((response) => {
+      expect(response.status).to.eq(200);
+      cy.log('Selenium Response:', response.body);
+    });
+
+    // Step 3: Trigger Appium test via API
+    cy.request('POST', 'http://jenkins-server/appium-trigger').then((response) => {
+      expect(response.status).to.eq(200);
+      cy.log('Appium Response:', response.body);
+    });
+
+    // Step 4: Final Cypress assertion
+    cy.get('h1').should('contain', 'Example Domain');
+  });
+});
+Approach 2: Invoke Selenium and Appium Using Command-Line Scripts
+This approach involves calling Selenium and Appium scripts as external commands using cy.exec().
+
+Steps to Implement
+Write Selenium/Appium Scripts Locally:
+Make sure the Selenium and Appium scripts are available on the local or CI environment, callable via command-line commands.
+
+Trigger Selenium/Appium from Cypress:
+
+Sample Cypress Test:
+javascript
+Copy code
+describe('Cypress + Selenium + Appium via CLI Integration', () => {
+  it('Should invoke Selenium and Appium scripts using CLI', () => {
+    // Step 1: Cypress actions
+    cy.visit('https://example.com');
+    cy.get('input[name="q"]').type('Test Automation{enter}');
+
+    // Step 2: Invoke Selenium via CLI
+    cy.exec('node seleniumScript.js').then((result) => {
+      cy.log('Selenium Result:', result.stdout);
+      expect(result.stdout).to.include('Selenium Title');
+    });
+
+    // Step 3: Invoke Appium via CLI
+    cy.exec('node appiumScript.js').then((result) => {
+      cy.log('Appium Result:', result.stdout);
+      expect(result.stdout).to.include('Appium Result');
+    });
+
+    // Step 4: Final Cypress assertion
+    cy.get('h1').should('contain', 'Example Domain');
+  });
+});
+Approach 3: Use Jenkins/Helios Pipeline to Orchestrate All Tests
+Configure a Jenkins or Helios pipeline that runs:
+Cypress tests
+Selenium and Appium tests in parallel or sequentially.
+Generate a unified report by aggregating the logs and results from all three test tools.
+Reporting Results from Selenium and Appium in Cypress
+To log the results from Selenium/Appium in Cypress reports:
+
+Use Mocha Awesome Reports to include logs from Selenium and Appium:
+Inside the cy.task() or cy.exec(), log the results returned from the scripts.
+Use cy.log() to store relevant messages in the Cypress Mocha report.
+Benefits of This Approach
+Decoupled codebases: Cypress, Selenium, and Appium remain independent but work together.
+Centralized reporting: You can still use Cypress for consolidated reporting.
+Easier orchestration: Use APIs or CLI commands instead of tightly coupling logic in cypress.config.js.
+Scalable: Easily extend to CI/CD pipelines when ready.
+Conclusion
+This alternative allows you to keep Cypress as the primary tool, using Selenium and Appium only when necessary. With APIs or CLI commands, you can maintain flexibility and avoid complex integration issues. This method also makes it easier to manage and scale tests as your automation strategy evolves.
+
+Let me know if you need further customization or help!
+
+
+
+
+
+
+You said:
+this solution is not feasible for me. Docker is not available in my environment 
+ChatGPT said:
+ChatGPT
+Got it! Since Docker is unavailable, let's try a hybrid orchestration where Cypress invokes Selenium and Appium directly on the same machine/environment without relying on containers. Below are some feasible options:
+
+Solution: Local Orchestration with Cypress, Selenium, and Appium
+Here, Cypress will act as the master orchestrator running tests in sequence. It will launch Selenium and Appium scripts directly from Cypress and capture their results. This can be done using:
+
+Command-line triggers via cy.exec().
+Node.js child processes invoked directly from Cypress.
+Approach: Trigger Selenium and Appium Locally from Cypress
+Steps Overview
+Install Selenium and Appium environments on the same machine where Cypress runs.
+Keep Selenium/Appium scripts available locally in your project folder.
+Use Cypress to execute these scripts as child processes and capture the results.
+Use Mocha reports or Cypress logs for unified reporting.
+Implementation Option 1: Use cy.exec() to Run Selenium and Appium Scripts
+Folder Structure Example
+bash
+Copy code
+project-root/
+│
+├── cypress/
+│   └── integration/
+│       └── myTest.spec.js   # Cypress test script
+│
+├── seleniumScripts/
+│   └── seleniumTest.js      # Selenium script
+│
+├── appiumScripts/
+│   └── appiumTest.js        # Appium script
+Cypress Test Code
+javascript
+Copy code
+describe('Cypress + Selenium + Appium Hybrid Test', () => {
+  it('Should run Cypress, then trigger Selenium and Appium scripts', () => {
+    // Step 1: Run Cypress actions
+    cy.visit('https://example.com');
+    cy.get('input[name="q"]').type('Hybrid Test{enter}');
+    cy.get('h1').should('contain', 'Example Domain');
+
+    // Step 2: Run Selenium script using cy.exec()
+    cy.exec('node ./seleniumScripts/seleniumTest.js').then((result) => {
+      cy.log('Selenium Output:', result.stdout);
+      expect(result.stdout).to.include('Selenium Passed');
+    });
+
+    // Step 3: Run Appium script using cy.exec()
+    cy.exec('node ./appiumScripts/appiumTest.js').then((result) => {
+      cy.log('Appium Output:', result.stdout);
+      expect(result.stdout).to.include('Appium Passed');
+    });
+
+    // Step 4: Final Cypress assertion
+    cy.get('footer').should('exist');
+  });
+});
+Implementation Option 2: Use Node.js Child Processes for Better Control
+This method uses Node’s child_process module to run Selenium and Appium scripts. It gives more flexibility if you need to handle outputs, errors, or timeouts in detail.
+
+Cypress Code Using Child Process
+javascript
+Copy code
+const { exec } = require('child_process');
+
+describe('Hybrid Test with Child Processes', () => {
+  it('Should invoke Selenium and Appium scripts via Node.js child processes', (done) => {
+    // Step 1: Run Selenium script
+    exec('node ./seleniumScripts/seleniumTest.js', (error, stdout, stderr) => {
+      if (error) {
+        cy.log('Selenium Error:', error.message);
+        return done(error);  // Fail the test if Selenium fails
+      }
+      cy.log('Selenium Output:', stdout);
+      expect(stdout).to.include('Selenium Passed');
+
+      // Step 2: Run Appium script
+      exec('node ./appiumScripts/appiumTest.js', (err, out) => {
+        if (err) {
+          cy.log('Appium Error:', err.message);
+          return done(err);  // Fail the test if Appium fails
+        }
+        cy.log('Appium Output:', out);
+        expect(out).to.include('Appium Passed');
+
+        // Step 3: Complete the test
+        done();  // Mark the Cypress test as completed
+      });
+    });
+  });
+});
+How to Set Up the Selenium and Appium Scripts Locally
+Selenium:
+
+Install Selenium WebDriver:
+Copy code
+npm install selenium-webdriver
+Example seleniumTest.js script:
+javascript
+Copy code
+const { Builder, By } = require('selenium-webdriver');
+
+async function runTest() {
+  let driver = await new Builder().forBrowser('chrome').build();
+  try {
+    await driver.get('https://example.com');
+    let title = await driver.getTitle();
+    console.log('Selenium Passed:', title);
+  } finally {
+    await driver.quit();
+  }
+}
+
+runTest();
+Appium:
+
+Install Appium and related libraries:
+Copy code
+npm install appium
+Example appiumTest.js script:
+javascript
+Copy code
+const wdio = require("webdriverio");
+
+const opts = {
+  path: '/wd/hub',
+  port: 4723,
+  capabilities: {
+    platformName: "Android",
+    platformVersion: "11.0",
+    deviceName: "emulator-5554",
+    app: "/path/to/app.apk",
+    automationName: "UiAutomator2",
+  },
+};
+
+async function runTest() {
+  const client = await wdio.remote(opts);
+  console.log("Appium Passed: App launched successfully");
+  await client.deleteSession();
+}
+
+runTest();
+Unified Reporting in Cypress
+Use Mocha Awesome Reports to log Selenium and Appium results alongside Cypress logs.
+Example:
+javascript
+Copy code
+cy.log('Selenium:', stdout);
+cy.log('Appium:', out);
+Benefits of This Approach
+Single Machine Setup: No Docker or external CI/CD required.
+Synchronized Execution: Cypress manages the flow, triggering Selenium/Appium only when needed.
+Unified Reporting: All results logged in Cypress, giving the team a single source of truth.
+Scalable: Easily extendable when CI/CD pipelines are ready.
+Let me know if this solution fits your environment or if you need further tweaks!
+
+
+
+
+
+
+You said:
+Is it possible if I developed selenium scripts and Appium scripts separately in eclipse and export and packaged in a jar with maven and run this jar in between of cypress execution ?
+ChatGPT said:
+ChatGPT
+Yes! This is a viable solution. You can develop Selenium and Appium scripts in Eclipse, package them as a Maven JAR file, and invoke the JAR from within Cypress. This allows you to keep your Selenium/Appium logic independent while still integrating them smoothly into Cypress.
+
+Below is how you can set this up:
+
+Step-by-Step Solution
+Step 1: Develop Selenium and Appium Tests in Eclipse
+Create a Maven project in Eclipse for Selenium and Appium scripts.
+
+Add dependencies for Selenium and Appium in the pom.xml.
+Example:
+
+xml
+Copy code
+<dependencies>
+  <dependency>
+    <groupId>org.seleniumhq.selenium</groupId>
+    <artifactId>selenium-java</artifactId>
+    <version>4.8.3</version>
+  </dependency>
+  <dependency>
+    <groupId>io.appium</groupId>
+    <artifactId>java-client</artifactId>
+    <version>8.4.1</version>
+  </dependency>
+</dependencies>
+Create your test scripts under the src/test/java directory.
+Example Selenium Script:
+
+java
+Copy code
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+
+public class SeleniumTest {
+    public static void main(String[] args) {
+        System.setProperty("webdriver.chrome.driver", "/path/to/chromedriver");
+        WebDriver driver = new ChromeDriver();
+        driver.get("https://example.com");
+        System.out.println("Selenium Test Passed: " + driver.getTitle());
+        driver.quit();
+    }
+}
+Example Appium Script:
+
+java
+Copy code
+import io.appium.java_client.AppiumDriver;
+import io.appium.java_client.MobileElement;
+import io.appium.java_client.android.AndroidDriver;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import java.net.URL;
+
+public class AppiumTest {
+    public static void main(String[] args) throws Exception {
+        DesiredCapabilities caps = new DesiredCapabilities();
+        caps.setCapability("platformName", "Android");
+        caps.setCapability("deviceName", "emulator-5554");
+        caps.setCapability("app", "/path/to/app.apk");
+
+        AppiumDriver<MobileElement> driver = new AndroidDriver<>(new URL("http://localhost:4723/wd/hub"), caps);
+        System.out.println("Appium Test Passed: App launched successfully");
+        driver.quit();
+    }
+}
+Package the project as a JAR file by running the Maven command:
+
+bash
+Copy code
+mvn clean package
+You’ll get a JAR file (e.g., automation-scripts.jar) under the target directory.
+
+Step 2: Place the JAR in Your Cypress Project
+Copy the generated automation-scripts.jar into a folder in your Cypress project (e.g., automation-scripts/).
+Step 3: Invoke the JAR File from Cypress Using cy.exec()
+You can use cy.exec() to call the JAR file during Cypress execution.
+
+Cypress Test Code Example
+javascript
+Copy code
+describe('Hybrid Test with Cypress, Selenium, and Appium', () => {
+  it('Should run Cypress, then trigger Selenium and Appium via JAR', () => {
+    // Step 1: Run Cypress test steps
+    cy.visit('https://example.com');
+    cy.get('h1').should('contain', 'Example Domain');
+
+    // Step 2: Run Selenium script via JAR
+    cy.exec('java -jar ./automation-scripts/automation-scripts.jar SeleniumTest').then((result) => {
+      cy.log('Selenium Output:', result.stdout);
+      expect(result.stdout).to.include('Selenium Test Passed');
+    });
+
+    // Step 3: Run Appium script via JAR
+    cy.exec('java -jar ./automation-scripts/automation-scripts.jar AppiumTest').then((result) => {
+      cy.log('Appium Output:', result.stdout);
+      expect(result.stdout).to.include('Appium Test Passed');
+    });
+
+    // Step 4: Final Cypress assertion
+    cy.get('footer').should('exist');
+  });
+});
+Step 4: Handle Errors Gracefully
+If the JAR execution fails, you can handle the error to prevent Cypress from failing the entire test:
+
+javascript
+Copy code
+cy.exec('java -jar ./automation-scripts/automation-scripts.jar SeleniumTest', { failOnNonZeroExit: false })
+  .then((result) => {
+    if (result.code !== 0) {
+      cy.log('Selenium Test Failed:', result.stderr);
+    } else {
+      cy.log('Selenium Output:', result.stdout);
+    }
+  });
+Step 5: Reporting
+You can integrate the outputs from the Selenium/Appium tests into Cypress Mocha reports for a unified report.
+
+Benefits of This Approach
+Decoupled Development: Selenium and Appium logic stays independent.
+Unified Execution: Cypress controls the flow and integrates everything.
+Simplified Setup: No Docker or complex CI/CD required.
+Reusable Scripts: Packaged JARs make Selenium and Appium scripts easy to share and maintain.
+This approach should meet your requirements by allowing you to run Selenium and Appium in conjunction with Cypress without additional infrastructure. Let me know if you need further clarification!
 
 
 
