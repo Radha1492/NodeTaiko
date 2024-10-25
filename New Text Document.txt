@@ -929,6 +929,76 @@ Simplified Setup: No Docker or complex CI/CD required.
 Reusable Scripts: Packaged JARs make Selenium and Appium scripts easy to share and maintain.
 This approach should meet your requirements by allowing you to run Selenium and Appium in conjunction with Cypress without additional infrastructure. Let me know if you need further clarification!
 
+@@@@@@@@@@@
+Sample Code to Close a Browser by Title
+const { Builder, By, Key, until } = require('selenium-webdriver');
+
+let driver;
+
+async function setupWebDriver() {
+  if (!driver) {
+    driver = await new Builder().forBrowser('chrome').build();
+  }
+}
+
+async function closeWindowByTitle(targetTitle) {
+  try {
+    const windowHandles = await driver.getAllWindowHandles();
+
+    for (let handle of windowHandles) {
+      await driver.switchTo().window(handle);  // Switch to the window
+
+      const title = await driver.getTitle();
+      console.log(`Found window with title: ${title}`);
+
+      if (title === targetTitle) {
+        console.log(`Closing window with title: ${targetTitle}`);
+        await driver.close();  // Close the matching window
+        break;  // Exit the loop once the window is closed
+      }
+    }
+
+    // Switch back to the remaining window (if needed)
+    const remainingWindows = await driver.getAllWindowHandles();
+    if (remainingWindows.length > 0) {
+      await driver.switchTo().window(remainingWindows[0]);
+    }
+  } catch (error) {
+    console.error('Error closing window:', error);
+  }
+}
+
+async function runSeleniumTest() {
+  try {
+    await setupWebDriver();
+
+    // Open two different pages to simulate multiple windows
+    await driver.get('https://example.com');
+    await driver.executeScript('window.open("https://google.com", "_blank");');
+
+    // Close the window with a specific title
+    await closeWindowByTitle('Google');
+
+    let remainingTitle = await driver.getTitle();
+    return `Remaining window title is: ${remainingTitle}`;
+  } catch (error) {
+    console.error('Error in Selenium test:', error);
+    return `Selenium Error: ${error.message}`;
+  }
+}
+
+async function closeWebDriver() {
+  if (driver) {
+    await driver.quit();
+    driver = null;
+  }
+}
+
+module.exports = { runSeleniumTest, closeWebDriver };
+
+
+
+
 
 
 
