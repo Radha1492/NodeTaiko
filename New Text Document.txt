@@ -997,92 +997,94 @@ async function closeWebDriver() {
 module.exports = { runSeleniumTest, closeWebDriver };
 
 @@@@@@
-Subject: Feedback on GitHub Copilot for Cypress Automation
 
-Hi [Manager's Name],
+const { Builder, By, Key, until } = require('selenium-webdriver');  
 
-I’ve been using GitHub Copilot in Visual Studio Code for the past ten days as requested, and I wanted to share my feedback on its effectiveness for our QA automation work, particularly with Cypress.
+async function runSeleniumTest({ url, locators, inputData }) {
+  // Step 1: Launch browser and navigate to the URL
+  let driver = await new Builder().forBrowser('chrome').build(); 
+  try {
+    // Step 2: Go to the specified URL
+    await driver.get(url);
 
-Overview of Copilot with Cypress Automation:
-GitHub Copilot has proven to be a valuable tool in supporting the QA automation workflow. Here are some specific observations:
+    // Step 3: Click on a link to navigate to a different page
+    let link = await driver.findElement(By.linkText(locators.linkText));
+    await link.click();
 
-Code Suggestions and Auto-completion:
+    // Step 4: Wait until the dropdown is visible
+    await driver.wait(until.elementLocated(By.id(locators.dropdownId)), 5000);
+    
+    // Step 5: Interact with the dropdown
+    let dropdown = await driver.findElement(By.id(locators.dropdownId));
+    await dropdown.sendKeys(inputData.dropdownOption);
 
-Copilot quickly suggests code snippets based on our established coding patterns, saving time by reducing repetitive code writing. For example, it provides prompt suggestions for Cypress commands such as cy.visit(), cy.get(), and form submissions.
-It is also helpful with assertions, where it suggests common validation patterns (like should('have.text', 'Expected Text')), which ensures accuracy and reduces the need for repeated typing.
-Improving Efficiency with Test Case Coverage:
+    // Step 6: Navigate back to the main page and interact with form fields
+    await driver.navigate().back();
+    let formLink = await driver.findElement(By.linkText(locators.formLinkText));
+    await formLink.click();
 
-When working on new test cases, Copilot offers suggestions based on my existing codebase. It often pre-fills steps in the automation script, allowing for faster creation of test cases, especially when adding coverage for typical UI interactions like form inputs, button clicks, and navigation.
-This feature has allowed me to focus more on edge cases and complex test scenarios, knowing that the more standard steps are covered by Copilot’s quick suggestions.
-Supporting Data-Driven Testing:
+    await driver.wait(until.elementLocated(By.name(locators.usernameField)), 5000);
+    await driver.findElement(By.name(locators.usernameField)).sendKeys(inputData.username);
+    await driver.findElement(By.name(locators.passwordField)).sendKeys(inputData.password, Key.RETURN);
 
-Copilot provides template suggestions for structuring data-driven tests and can help create loops or functions that handle multiple test data sets efficiently. This has been beneficial for generating dynamic test cases in Cypress where we validate different data inputs.
-Learning from Code Context:
+    // Step 7: Handle an alert (if any appears)
+    try {
+      await driver.wait(until.alertIsPresent(), 3000);
+      let alert = await driver.switchTo().alert();
+      console.log('Alert text:', await alert.getText());
+      await alert.accept();
+    } catch (e) {
+      console.log('No alert appeared.');
+    }
 
-Copilot seems to adapt to the coding context and style, which is especially useful when it comes to our specific setup with Cypress. For instance, it picks up on our frequently used libraries, custom commands, or helper functions, making it easier to incorporate them consistently across tests.
-Limitations Noted:
+    // Step 8: Get the title for reporting
+    let title = await driver.getTitle();
+    return `Title after login: ${title}`;  
 
-While Copilot is excellent with straightforward Cypress commands, it sometimes suggests redundant or slightly off-target code for complex test logic. Adjustments are still needed, particularly for custom workflows unique to our project.
-There are occasional scenarios where Copilot suggests code that isn’t compatible with our testing framework or project-specific configurations, so a degree of validation is required.
-Overall Impression:
-GitHub Copilot has been a valuable addition to our Cypress automation work, contributing positively to efficiency and test consistency. It helps streamline routine tasks and allows us to focus on refining complex test cases. With regular use, I expect it will continue to learn and better adapt to our specific requirements.
+  } catch (error) {
+    console.error('Error in Selenium test:', error);
+    return `Selenium Error: ${error.message}`;
+  } finally {
+    await driver.quit();
+  }
+}
 
-Please let me know if there’s any additional feedback you’d like or if I should explore Copilot’s capabilities further with other automation tasks.
+module.exports = { runSeleniumTest };
+@@@@@@
+const { runSeleniumTest } = require('./seleniumScript');
 
-Best regards,
-[Your Name]
+module.exports = {
+  e2e: {
+    setupNodeEvents(on, config) {
+      on('task', {
+        runSeleniumTest: (options) => runSeleniumTest(options)
+      });
+    }
+  }
+};
+@@@@
+
+cy.task('runSeleniumTest', {
+  url: 'https://the-internet.herokuapp.com/',
+  locators: {
+    linkText: 'Dropdown',
+    dropdownId: 'dropdown',
+    formLinkText: 'Login',
+    usernameField: 'username',
+    passwordField: 'password'
+  },
+  inputData: {
+    dropdownOption: 'Option 1',
+    username: 'user1',
+    password: 'password123'
+  }
+}).then((result) => {
+  cy.log(result); // Log the result in Cypress
+});
 
 
 
 
-
-
-You said:
-Can you add some more complex examples
-ChatGPT said:
-ChatGPT
-Certainly! Here’s an updated email with additional complex examples of how GitHub Copilot aids in Cypress automation.
-
-Subject: Feedback on GitHub Copilot for Cypress Automation
-
-Hi [Manager's Name],
-
-I’ve been using GitHub Copilot in Visual Studio Code as requested, and I wanted to share detailed feedback on its usefulness in our QA automation, particularly with Cypress. Over the last ten days, Copilot has provided a range of benefits that support our workflows, including handling complex scenarios effectively.
-
-Key Benefits and Complex Examples with Cypress:
-Efficiently Building Complex Test Flows:
-
-Copilot has been helpful when developing end-to-end test flows that involve multiple steps across different pages. For instance, in a test where we simulate a user journey from login to completing a multi-step form, Copilot suggests code sequences for navigating between pages, handling form inputs, and validating each stage.
-It has been particularly useful for chaining Cypress commands with built-in waits and assertions, ensuring each step completes before the next one begins.
-Dynamic Data Handling and Parameterization:
-
-Copilot suggests functions and loops for managing complex data sets, helping us easily set up data-driven tests with different user profiles or transaction types. When we need to parameterize test data for scenarios like testing with multiple user roles or varied input conditions, Copilot’s suggestions simplify this process by dynamically adapting code patterns based on previous entries.
-For example, it offers efficient ways to handle data fetched from fixtures or external files, and even suggests the structure for nested assertions to validate data based on specific conditions.
-Streamlining API Interactions and Mocking:
-
-Our tests often require API calls to set up preconditions or validate results. Copilot has been useful for setting up Cypress cy.request() calls, automatically generating headers, payloads, and assertions based on typical API response structures. This has been particularly useful when testing end-to-end flows where backend data needs to be validated alongside the frontend.
-When mocking APIs, Copilot suggests code for intercepting API calls and providing custom responses. This functionality speeds up test setups where we need to simulate various backend responses to cover edge cases.
-Managing Complex DOM Interactions and Dynamic Elements:
-
-For complex UI elements like dropdowns within nested elements or dynamically loaded components, Copilot has been useful in suggesting precise selectors and waiting mechanisms (cy.wait(), cy.intercept()).
-When handling pop-ups, modals, or dynamically updated content, Copilot generates code snippets that chain commands with retries and conditions, reducing flakiness. For instance, in scenarios where modals appear conditionally, it suggests handling these elements without breaking the test flow.
-Creating Custom Cypress Commands and Reusable Functions:
-
-Copilot helps set up reusable custom Cypress commands by analyzing the code structure of our existing tests. For example, it suggests custom commands for common actions like logging in, checking notifications, or navigating specific menus, which can be reused across multiple test cases.
-This has proven valuable for consistency across tests and ensures we adhere to best practices with modular, maintainable code.
-Error-Handling and Debugging Support:
-
-Copilot has provided helpful snippets for logging and error handling, which aids in debugging complex test cases. For example, it suggests adding console logs at strategic points or adding retry logic for flaky elements. It also suggests patterns for cy.on() events to catch specific errors like network failures, helping with resilience in tests.
-Limitations Observed:
-For unique workflows or heavily customized components, Copilot’s suggestions sometimes require fine-tuning. For instance, in tests with highly specific locators or unusual UI behavior, Copilot occasionally suggests standard approaches that don’t fully align with our requirements.
-When implementing custom configurations or integrating with other testing tools, additional manual adjustments are needed to ensure compatibility.
-Overall Impression:
-GitHub Copilot has proven effective for Cypress automation, saving time on repetitive coding and supporting the rapid development of complex test cases. Its ability to recognize common patterns and suggest code based on our practices makes it a beneficial tool in our automation toolkit. With continued use, I believe Copilot will continue to improve its accuracy and relevance in our workflows.
-
-Please let me know if you’d like additional feedback or if I should explore specific scenarios further.
-
-Best regards,
-[Your Name]
 
 
 
